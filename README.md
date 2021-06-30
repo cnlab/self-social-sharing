@@ -16,6 +16,8 @@ The specification curve analyses are reported [here](https://cnlab.github.io/sel
 
 The downsampled analyses are reported [here](https://cnlab.github.io/self-social-sharing/analysis/downsampled_analysis)
 
+## Analysis reproduction
+To reproduce the analyses in the manuscript, first execute the study cleaning scripts, then the study prep scripts, and finally the analysis scripts (`demographics.Rmd`, `correlational.Rmd`, `causal.Rmd`, `sca.Rmd`, `downsampled_analysis.Rmd`).
 
 ## Directory structure
 
