@@ -44,6 +44,9 @@ if (!require(purrr)) {
 if (!require(furrr)) {
   install.packages('furrr')
 }
+if (!require(ggpubr)) {
+  install.packages('ggpubr')
+}
 devtools::install_github("dcosme/specr", ref = "plotmods")
 ```
 
@@ -246,56 +249,59 @@ subsets_3 = list(content = unique(model_df$content),
                  sharing_type = unique(model_df$sharing_type),
                  medium = unique(model_df$medium))
 
-# broadcast covid
-subsets_1 = map(subsets_1, as.character)
-df_1 = subsets_1 %>%
-    cross %>%
-    map(~ create_subsets(subsets = .x, df = model_df) %>%
-          map(~ dplyr::select(.x, -filter)) %>%
-          reduce(dplyr::inner_join) %>%
-          dplyr::mutate(filter = paste(names(.x),
-                                       .x,
-                                       collapse = " & ",
-                                       sep = " = "))) %>%
-  Filter(function(x) nrow(x) > 0, .) # filter out empty dataframes
-
-# medium, sharing type
-subsets_2 = map(subsets_2, as.character)
-df_2 = subsets_2 %>%
-    cross %>%
-    map(~ create_subsets(subsets = .x, df = model_df) %>%
-          map(~ dplyr::select(.x, -filter)) %>%
-          reduce(dplyr::inner_join) %>%
-          dplyr::mutate(filter = paste(names(.x),
-                                       .x,
-                                       collapse = " & ",
-                                       sep = " = "))) %>%
-  Filter(function(x) nrow(x) > 0, .) %>% # filter out empty dataframes
-  Filter(function(x) sum(x$filter == "sharing_type = narrowcast & medium = social media") == 0, .)
-
-# combine subsets 1 and 2 
-df_12 = append(df_1, df_2)
-
-# content, medium, sharing type
-subsets_3 = map(subsets_3, as.character)
-df_3 = subsets_3 %>%
-    cross %>%
-    map(~ create_subsets(subsets = .x, df = model_df) %>%
-          map(~ dplyr::select(.x, -filter)) %>%
-          reduce(dplyr::inner_join) %>%
-          dplyr::mutate(filter = paste(names(.x),
-                                       .x,
-                                       collapse = " & ",
-                                       sep = " = "))) %>%
-  Filter(function(x) nrow(x) > 0, .) # filter out empty dataframes
-
-# divid df_3 into two subsets to reduce output file size
-subsetList <- function(myList, elementNames) {
-    lapply(elementNames, FUN=function(x) myList[[x]])
+# create the subset dataframes if the models have not yet been run
+if (!file.exists("models/sca_output_12.RDS")) {
+  # broadcast covid
+  subsets_1 = map(subsets_1, as.character)
+  df_1 = subsets_1 %>%
+      cross %>%
+      map(~ create_subsets(subsets = .x, df = model_df) %>%
+            map(~ dplyr::select(.x, -filter)) %>%
+            reduce(dplyr::inner_join) %>%
+            dplyr::mutate(filter = paste(names(.x),
+                                         .x,
+                                         collapse = " & ",
+                                         sep = " = "))) %>%
+    Filter(function(x) nrow(x) > 0, .) # filter out empty dataframes
+  
+  # medium, sharing type
+  subsets_2 = map(subsets_2, as.character)
+  df_2 = subsets_2 %>%
+      cross %>%
+      map(~ create_subsets(subsets = .x, df = model_df) %>%
+            map(~ dplyr::select(.x, -filter)) %>%
+            reduce(dplyr::inner_join) %>%
+            dplyr::mutate(filter = paste(names(.x),
+                                         .x,
+                                         collapse = " & ",
+                                         sep = " = "))) %>%
+    Filter(function(x) nrow(x) > 0, .) %>% # filter out empty dataframes
+    Filter(function(x) sum(x$filter == "sharing_type = narrowcast & medium = social media") == 0, .)
+  
+  # combine subsets 1 and 2 
+  df_12 = append(df_1, df_2)
+  
+  # content, medium, sharing type
+  subsets_3 = map(subsets_3, as.character)
+  df_3 = subsets_3 %>%
+      cross %>%
+      map(~ create_subsets(subsets = .x, df = model_df) %>%
+            map(~ dplyr::select(.x, -filter)) %>%
+            reduce(dplyr::inner_join) %>%
+            dplyr::mutate(filter = paste(names(.x),
+                                         .x,
+                                         collapse = " & ",
+                                         sep = " = "))) %>%
+    Filter(function(x) nrow(x) > 0, .) # filter out empty dataframes
+  
+  # divid df_3 into two subsets to reduce output file size
+  subsetList <- function(myList, elementNames) {
+      lapply(elementNames, FUN=function(x) myList[[x]])
+  }
+             
+  df_3a = subsetList(df_3, 1:4)
+  df_3b = subsetList(df_3, 5:9)
 }
-           
-df_3a = subsetList(df_3, 1:4)
-df_3b = subsetList(df_3, 5:9)
 ```
 
 # run SCA {.tabset}
@@ -314,7 +320,7 @@ if (!file.exists("models/sca_output_12.RDS")) {
                                                        keep.results = FALSE) %>%
                           mutate(subsets = unique(.x$filter)))
   # save output
-  saveRDS(output, "models/sca_output_12.RDS")
+  saveRDS(output_12, "models/sca_output_12.RDS")
 
 } else {
   
@@ -333,14 +339,14 @@ if (!file.exists("models/sca_output_3a.RDS")) {
                                                        keep.results = FALSE) %>%
                           mutate(subsets = unique(.x$filter)))
   # save output
-  saveRDS(output, "models/sca_output_3a.RDS")
+  saveRDS(output_3a, "models/sca_output_3a.RDS")
 
 } else {
   # load output
   output_3a = readRDS("models/sca_output_3a.RDS")
 }
 
-# df_3a
+# df_3b
 if (!file.exists("models/sca_output_3b.RDS")) {
   # setup parallelization with furrr
   plan(multisession, workers = 10)
@@ -352,7 +358,7 @@ if (!file.exists("models/sca_output_3b.RDS")) {
                           mutate(subsets = unique(.x$filter)))
   
   # save output
-  saveRDS(output, "models/sca_output_3b.RDS")
+  saveRDS(output_3b, "models/sca_output_3b.RDS")
 
 } else {
   # load output
@@ -363,7 +369,6 @@ if (!file.exists("models/sca_output_3b.RDS")) {
 ## tidy output
 ```{r}
 output1 = bind_rows(output_12, output_3a, output_3b) %>%
-  select(-res) %>%
   mutate(x = gsub("msg_rel_", "", x),
          x = gsub("_", " ", x),
          content = ifelse(grepl("covid", subsets), "COVID-19",
@@ -805,6 +810,34 @@ plot_sca_compare = function(data, pointrange = TRUE, labels = c("A", "B"),
 ## main manuscript plot
 This plot is reported in Figure 3.
 ```{r, fig.width=14, fig.height=16}
+self_between = plot_sca(data = filter(output1, grepl("self between", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
+         color_vars = "medium", palette = palette[3:4],
+         remove_facet = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls"), limits = c(-.3, 1),
+         collapse_content = TRUE)
+
+social_between = plot_sca(data = filter(output1, grepl("social between", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(.5, 1), text_size = 18,
+         color_vars = "medium", palette = palette[3:4],
+         remove_y = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls"), limits = c(-.3, 1),
+         collapse_content = TRUE)
+
+self_within = plot_sca(data = filter(output1, grepl("self within", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
+         color_vars = "sharing", palette = palette_sharing,
+         remove_facet = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls"), limits = c(-0, .4),
+         collapse_content = TRUE)
+
+social_within = plot_sca(data = filter(output1, grepl("social within", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
+         color_vars = "sharing", palette = palette_sharing,
+         remove_y = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls"), limits = c(-0, .4),
+         collapse_content = TRUE)
+
 ggarrange(self_between, social_between, self_within, social_within, 
           ncol = 2, nrow = 2, labels = c("A", "B", "C", "D"), widths = c(.51, .49, .51, .49))
 ```
