@@ -1,0 +1,361 @@
+---
+title: "Demographics"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen = 999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+
+This code summarizes demographic information across studies and for each study separately. 
+
+# prep data {.tabset}
+## load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(kableExtra)) {
+  install.packages('kableExtra')
+}
+```
+
+## define aesthetics
+```{r}
+palette = c("#3B9AB2", "#EBCC2A", "#F21A00")
+```
+
+## load and merge data
+```{r}
+# demographic data
+study1 = read.csv("../data/study1_demo.csv", stringsAsFactors = FALSE)
+
+study2 = read.csv("../data/study2_demo.csv", stringsAsFactors = FALSE)
+
+study3 = read.csv("../data/study3_demo.csv", stringsAsFactors = FALSE)
+
+study4 = read.csv("../data/study4_demo.csv", stringsAsFactors = FALSE)
+
+study5 = read.csv("../data/study5_demo.csv", stringsAsFactors = FALSE)
+
+study6 = read.csv("../data/study6_demo.csv", stringsAsFactors = FALSE)
+
+# merge
+merged = bind_rows(study1, study2, study3, study4, study5 ,study6)
+
+# tidy
+demo = merged %>%
+  mutate(value = ifelse(value == "Would rather not say", "Prefer not to say", value),
+         value = ifelse(is.na(value), "Not reported", value)) %>%
+  group_by(study, item, value) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  filter(!item %in% c("gender_4_TEXT", "race_self")) %>%
+  rename(" " = item)
+```
+
+# geographic distribution {.tabset}
+## by study {.tabset}
+### study 1
+```{r}
+states = merged %>%
+  filter(grepl("state", item)) %>%
+  spread(item, value) %>%
+  filter(study == "study 1") %>%
+  group_by(state) %>%
+  summarize(n = n())
+
+states %>%
+  usmap::plot_usmap(data = ., values = "n", color = "grey50") +
+  scale_fill_gradient2(low = palette[1], mid = palette[2], midpoint = max(states$n) / 2, high = palette[3],
+                       name = "", na.value = NA, limits = c(0, max(states$n)), breaks = seq(0, max(states$n), 50)) +
+  theme(text = element_text(size = 12, family = "Futura Medium"),
+        legend.position = "right")
+```
+
+### study 5
+```{r}
+states = merged %>%
+  filter(grepl("state", item)) %>%
+  spread(item, value) %>%
+  filter(study == "study 5") %>%
+  group_by(state) %>%
+  summarize(n = n())
+
+states %>%
+  usmap::plot_usmap(data = ., values = "n", color = "grey50") +
+  scale_fill_gradient2(low = palette[1], mid = palette[2], midpoint = max(states$n) / 2, high = palette[3],
+                       name = "", na.value = NA, limits = c(0, max(states$n)), breaks = seq(0, max(states$n), 10)) +
+  theme(text = element_text(size = 12, family = "Futura Medium"),
+        legend.position = "right")
+```
+
+### study 6
+```{r}
+states = merged %>%
+  filter(grepl("state", item)) %>%
+  spread(item, value) %>%
+  filter(study == "study 6") %>%
+  group_by(state) %>%
+  summarize(n = n())
+
+states %>%
+  usmap::plot_usmap(data = ., values = "n", color = "grey50") +
+  scale_fill_gradient2(low = palette[1], mid = palette[2], midpoint = max(states$n) / 2, high = palette[3],
+                       name = "", na.value = NA, limits = c(0, max(states$n)), breaks = seq(0, max(states$n), 10)) +
+  theme(text = element_text(size = 12, family = "Futura Medium"),
+        legend.position = "right")
+```
+
+## combined
+```{r}
+states = merged %>%
+  filter(grepl("state", item)) %>%
+  spread(item, value) %>%
+  group_by(state) %>%
+  summarize(n = n())
+
+states %>%
+  usmap::plot_usmap(data = ., values = "n", color = "grey50") +
+  scale_fill_gradient2(low = palette[1], mid = palette[2], midpoint = max(states$n) / 2, high = palette[3],
+                       name = "", na.value = NA, limits = c(0, max(states$n)), breaks = seq(0, max(states$n), 50)) +
+  theme(text = element_text(size = 12, family = "Futura Medium"),
+        legend.position = "right")
+```
+
+# age {.tabset}
+## by study
+```{r}
+merged %>%
+  filter(item == "age") %>%
+  mutate(value = as.numeric(value)) %>%
+  group_by(study) %>%
+  summarize(`age range` = sprintf("%s - %s", min(value, na.rm = TRUE), max(value, na.rm = TRUE)),
+            `mean age` = mean(value, na.rm = TRUE),
+            `sd age` = sd(value, na.rm = TRUE)) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+## combined
+```{r}
+merged %>%
+  filter(item == "age") %>%
+  mutate(value = as.numeric(value)) %>%
+  summarize(`age range` = sprintf("%s - %s", min(value, na.rm = TRUE), max(value, na.rm = TRUE)),
+            `mean age` = mean(value, na.rm = TRUE),
+            `sd age` = sd(value, na.rm = TRUE)) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+## student year
+```{r}
+demo %>%
+  filter(` ` == "student_grade") %>%
+  group_by(study) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%"),
+         value = ifelse(is.na(value), "Not reported", value)) %>%
+  select(-n, -total, -` `) %>%
+  spread(study, percent) %>%
+  mutate(value = factor(value, c("First year", "Second year", "Third year",
+                                 "Fourth year", "Fifth year or higher"))) %>%
+  arrange(value) %>%
+  kable(digits = 1) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+# gender {.tabset}
+## by study
+```{r}
+demo %>%
+  filter(` ` == "gender") %>%
+  group_by(study) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%"),
+         value = ifelse(is.na(value), "Not reported", value)) %>%
+  select(-n, -total, -` `) %>%
+  spread(study, percent) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+## combined
+```{r}
+demo %>%
+  filter(` ` == "gender") %>%
+  group_by(value) %>%
+  summarize(n = sum(n)) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%"),
+         value = ifelse(is.na(value), "Not reported", value)) %>%
+  select(-n, -total) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+# race and ethnicity {.tabset}
+## by study
+```{r}
+hispanic_latinx = demo %>%
+  filter(` ` == "Hispanic or Latinx") %>%
+  group_by(study) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%")) %>%
+  select(-n, -total) %>%
+  spread(value, percent) %>%
+  select(study, Yes) %>%
+  rename("percent" = Yes) %>%
+  mutate(`race / ethnicity` = "Hispanic or Latinx")
+
+demo %>%
+  filter(` ` == "race") %>%
+  filter(!value %in% c("Hispanic", "Latino")) %>% #counted already in the hispanic_latinx item
+  group_by(study) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%"),
+         value = ifelse(is.na(value), "Not reported", value)) %>%
+  select(study, value, percent) %>%
+  rename("race / ethnicity" = value) %>%
+  bind_rows(., hispanic_latinx) %>%
+  arrange(`race / ethnicity`) %>%
+  spread(study, percent) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+## combined
+```{r}
+hispanic_latinx = demo %>%
+  filter(` ` == "Hispanic or Latinx") %>%
+  group_by(value) %>%
+  summarize(n = sum(n)) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%")) %>%
+  select(-n, -total) %>%
+  spread(value, percent) %>%
+  select(Yes) %>%
+  rename("percent" = Yes) %>%
+  mutate(`race / ethnicity` = "Hispanic or Latinx")
+
+demo %>%
+  filter(` ` == "race") %>%
+  filter(!value %in% c("Hispanic", "Latino")) %>% #counted already in the hispanic_latinx item
+  group_by(value) %>%
+  summarize(n = sum(n)) %>%
+  ungroup() %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%"),
+         value = ifelse(is.na(value), "Not reported", value)) %>%
+  select(value, percent) %>%
+  rename("race / ethnicity" = value) %>%
+  bind_rows(., hispanic_latinx) %>%
+  arrange(`race / ethnicity`) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+# education {.tabset}
+## by study
+```{r}
+demo %>%
+  filter(` ` == "highest degree completed") %>%
+  group_by(study) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%")) %>%
+  mutate(value = factor(value, levels = c("Less than high school", "High school graduate (diploma)", "High school graduate (GED)", 
+                                          "Some college (1-4 years, no degree)", "Associate's degree (including occupational or academic degrees)",
+                                          "Bachelor's degree (BA, BS, etc)", "Master's degree (MA, MS, MENG, MSW, etc)",
+                                          "Professional school degree (MD, DDC, JD, etc)", "Doctorate degree (PhD, EdD, etc)"))) %>%
+  arrange(value) %>%
+  select(study, value, percent) %>%
+  rename("highest degree completed" = value) %>%
+  spread(study, percent) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+## combined
+```{r}
+demo %>%
+  filter(` ` == "highest degree completed") %>%
+  group_by(value) %>%
+  summarize(n = sum(n)) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%")) %>%
+  mutate(value = factor(value, levels = c("Less than high school", "High school graduate (diploma)", "High school graduate (GED)", 
+                                          "Some college (1-4 years, no degree)", "Associate's degree (including occupational or academic degrees)",
+                                          "Bachelor's degree (BA, BS, etc)", "Master's degree (MA, MS, MENG, MSW, etc)",
+                                          "Professional school degree (MD, DDC, JD, etc)", "Doctorate degree (PhD, EdD, etc)"))) %>%
+  arrange(value) %>%
+  select(value, percent) %>%
+  rename("highest degree completed" = value) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+# SES {.tabset}
+## by study
+```{r}
+demo %>%
+  filter(` ` == "household income") %>%
+  group_by(study) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%")) %>%
+  mutate(value = ifelse(is.na(value), "Not reported", value),
+         value = factor(value, levels = c("Less than $5,000", "$5,000 through $11,999", "$12,000 through $15,999", "$16,000 through $24,999", 
+                                          "$25,000 through $34,999", "$35,000 through $49,999", "$50,000 through $74,999", "$75,000 through $99,999",
+                                          "$100,000 and greater", "Not reported"))) %>%
+  arrange(value) %>%
+  select(study, value, percent) %>%
+  rename("household income" = value) %>%
+  spread(study, percent) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+## combined
+```{r}
+demo %>%
+  filter(` ` == "household income") %>%
+  group_by(value) %>%
+  summarize(n = sum(n)) %>%
+  mutate(total = sum(n),
+         percent = sprintf("%.1f%s", (n / total) * 100, "%")) %>%
+  mutate(value = ifelse(is.na(value), "Not reported", value),
+         value = factor(value, levels = c("Less than $5,000", "$5,000 through $11,999", "$12,000 through $15,999", "$16,000 through $24,999", 
+                                          "$25,000 through $34,999", "$35,000 through $49,999", "$50,000 through $74,999", "$75,000 through $99,999",
+                                          "$100,000 and greater", "Not reported"))) %>%
+  arrange(value) %>%
+  select(value, percent) %>%
+  rename("household income" = value) %>%
+  mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
+  kable(digits = 1) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```

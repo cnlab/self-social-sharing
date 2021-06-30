@@ -1,0 +1,449 @@
+---
+title: "Downsampled analyses"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen = 999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+
+In these analyses, we test correlational associations between self and social relevance and broad- and narrowcast sharing intentions in a subset of data in which the correlations between self and social relevance are lower.
+
+# prep data {.tabset}
+First, we load the relevant packages and data, and define the plotting aesthetics.
+
+## load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(knitr)) {
+  install.packages('knitr')
+}
+if (!require(kableExtra)) {
+  install.packages('kableExtra')
+}
+if (!require(lmerTest)) {
+  install.packages('lmerTest')
+}
+```
+
+## define aesthetics
+```{r}
+palette = c("#E64626", "#FF9900", "#FFE136", "#00A896","#1985A1", "#5A69AF")
+palette_sharing = c("#4c5c68", "#B8B3BE")
+
+plot_aes = theme_minimal() +
+  theme(legend.position = "top",
+        legend.text = element_text(size = 12),
+        text = element_text(size = 16, family = "Futura Medium"),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        axis.ticks.y = element_blank())
+```
+
+## load and merge data
+```{r}
+# article info
+article_info_study6 = read.csv("../../causal_study/original_stim_list.csv", stringsAsFactors = FALSE) %>%
+  select(main_headline, clicks)
+
+articles = read.csv("../../causal_study/articles.csv", stringsAsFactors = FALSE) %>%
+  left_join(., article_info_study6) %>%
+  mutate(item = sprintf("study 6_%s", article_number)) %>%
+  select(content, item, clicks)
+
+# cleaned study data
+study1 = read.csv("../data/study1.csv", stringsAsFactors = FALSE)
+
+study2 = read.csv("../data/study2.csv", stringsAsFactors = FALSE)
+
+study3 = read.csv("../data/study3.csv", stringsAsFactors = FALSE)
+
+study4 = read.csv("../data/study4.csv", stringsAsFactors = FALSE)
+
+study5 = read.csv("../data/study5.csv", stringsAsFactors = FALSE)
+
+study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE) %>%
+  select(-article_cond)
+
+# merge dataframes and z-score within study and sharing type
+merged = bind_rows(study1, study2, study3, study4, study5, study6) %>%
+  group_by(study, sharing_type) %>%
+  mutate(msg_share_std = scale(msg_share, scale = TRUE, center = TRUE))
+```
+
+# message-level {.tabset}
+In these analyses, select a subset of messages that have correlations between self and social relevance < .7.
+
+## correlations {.tabset}
+### descriptives {.tabset}
+Describe the correlations between self and social relevance by study and content type.
+
+#### across content
+```{r}
+cors_spread = merged %>%
+  ungroup() %>%
+  select(study, item, msg_rel_self, msg_rel_social) %>%
+  unique()
+
+cors = cors_spread %>%
+  nest(-c(study, item)) %>%
+  mutate(test = map(data, possibly(~ cor.test(.$msg_rel_self, .$msg_rel_social), otherwise = NULL))) %>%
+  filter(!test == "NULL") %>%
+  mutate(coefs = map(test,
+                     broom::tidy,
+                     conf.int = TRUE,
+                     conf.level = .95)) %>% 
+  unnest(coefs, .drop = TRUE) %>%
+  mutate_if(is.numeric, round, 2)
+
+cors %>%
+  group_by(study) %>%
+  summarize(`mean correlation` = mean(estimate, na.rm = TRUE),
+            `sd correlation` = sd(estimate, na.rm = TRUE),
+            min = min(estimate, na.rm = TRUE),
+            max = max(estimate, na.rm = TRUE)) %>%
+  mutate(`range correlation` = sprintf("%.2f, %.2f", min, max)) %>%
+  select(-min, -max) %>%
+  kable(digits = 2) %>%
+  kableExtra::kable_styling()
+```
+
+#### by content
+```{r}
+message_content = merged %>%
+  ungroup() %>%
+  select(study, item, content) %>%
+  unique()
+
+cors %>%
+  left_join(., message_content) %>%
+  group_by(study, content) %>%
+  summarize(`mean correlation` = mean(estimate, na.rm = TRUE),
+            `sd correlation` = sd(estimate, na.rm = TRUE),
+            min = min(estimate, na.rm = TRUE),
+            max = max(estimate, na.rm = TRUE)) %>%
+  mutate(`range correlation` = sprintf("%.2f, %.2f", min, max)) %>%
+  select(-min, -max) %>%
+  kable(digits = 2) %>%
+  kableExtra::kable_styling()
+```
+
+### plot
+This plot is reported in supplementary material Figure S1.
+
+```{r, fig.width=8, fig.height=5}
+cors %>%
+  arrange(study, item) %>%
+  mutate(item = row_number(),
+         V1 = sprintf("self_%s", row_number()),
+         V2 = sprintf("social_%s", row_number())) %>%
+  ggplot(aes(item, estimate, color = study)) +
+  geom_point() +
+  geom_hline(yintercept = .7) +
+  scale_color_manual(values = palette) +
+  labs(x = "\nmessage number", y = "correlation between\nself and social relevance\n") +
+  plot_aes +
+  theme(legend.text = element_text(size = 11))
+```
+
+### number of messages per study with < .7 correlation
+```{r}
+data_lower_cors = cors %>%
+  filter(estimate < .7)
+
+total_n = merged %>%
+  ungroup() %>%
+  select(study, item) %>%
+  unique() %>%
+  group_by(study) %>%
+  summarize(`total n` = n())
+
+data_lower_cors %>%
+  group_by(study) %>%
+  summarize(n = n()) %>%
+  left_join(., total_n) %>%
+  mutate(percent = (n / `total n`) * 100) %>%
+  kable(digits = 2) %>%
+  kableExtra::kable_styling()
+```
+
+## downsampled mega-analysis {.tabset}
+Estimate the mega-analysis model in the downsampled dataset.
+
+### run model
+```{r}
+data_downsample = merged %>%
+  filter(item %in% data_lower_cors$item)
+
+model = lmerTest::lmer(msg_share_std ~ 0 + msg_rel_self_between*sharing_type +
+                                 msg_rel_self_within*sharing_type +
+                                 msg_rel_social_between*sharing_type +
+                                 msg_rel_social_within*sharing_type +
+                                 (1 + msg_rel_self_within + msg_rel_social_within | SID) +
+                                 (1 + msg_rel_self_within + msg_rel_social_within | item),
+                               data = data_downsample,
+                       control = lmerControl(optimizer = "bobyqa"))
+
+summary(model)
+```
+
+### print variance inflation factors
+```{r}
+car::vif(model)
+```
+
+### plot
+This plot is reported in supplementary material Figure S2.
+
+```{r, fig.width=10, fig.height=6}
+predicted = ggeffects::ggpredict(model, c("msg_rel_self_between [-3:3]", "sharing_type")) %>%
+  data.frame() %>%
+  mutate(type = "self_between") %>%
+  bind_rows(ggeffects::ggpredict(model, c("msg_rel_self_within [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "self_within")) %>%
+  bind_rows(ggeffects::ggpredict(model, c("msg_rel_social_between [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "social_between")) %>%
+  bind_rows(ggeffects::ggpredict(model, c("msg_rel_social_within [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "social_within"))
+
+points = data_downsample %>%
+  select(-group) %>%
+  rename("group" = sharing_type,
+         "predicted" = msg_share_std) %>%
+  select(study, SID, group, predicted, contains("within"), contains("between")) %>%
+  gather(type, x, contains("msg")) %>%
+  mutate(type = gsub("msg_rel_", "", type),
+         group = ifelse(group == 0, "broadcast", "narrowcast")) %>%
+  extract(type, c("variable", "type"), "(.*)_(.*)") %>%
+  filter(x < 3 & x > -3)
+
+predicted %>%
+  mutate(group = ifelse(group == 0, "broadcast", "narrowcast")) %>%
+  extract(type, c("variable", "type"), "(.*)_(.*)") %>%
+  ggplot(aes(x, predicted, color = group, fill = group, linetype = type)) +
+  geom_point(data = points, aes(x, predicted), alpha = .02, size = .25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .2, color = NA) +
+  geom_line(size = 1) +
+  facet_grid(~variable) +
+  scale_color_manual(name = "", values = palette_sharing) +
+  scale_fill_manual(name = "", values = palette_sharing) +
+  scale_linetype_manual(name = "", values = c("solid", "dotted")) +
+  guides(linetype = guide_legend(override.aes = list(fill = NA))) +
+  labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
+  plot_aes  +
+  theme(legend.position = "top")
+```
+
+### model summary table
+```{r}
+model %>%
+  broom.mixed::tidy(conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  rename("SE" = std.error,
+         "t" = statistic,
+         "p" = p.value) %>%
+  select(-group, -effect) %>%
+  mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
+  mutate(term = gsub(":", " x ", term),
+         term = gsub("msg_", "", term),
+         term = gsub("_", " ", term),
+         term = gsub("within", "within", term),
+         term = gsub("between", "between", term),
+         term = gsub("rel self", "self relevance", term),
+         term = gsub("rel social", "social relevance", term),
+         term = gsub("sharing type", "sharing type (narrowcast)", term),
+         p = ifelse(p < .001, "< .001",
+                    ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
+         `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
+  select(term, `b [95% CI]`, df, t, p) %>%
+  kable()  %>%
+  kable_styling()
+```
+
+# person-level {.tabset}
+In these analyses, select a subset of people that have correlations between self and social relevance < .7.
+
+Because participants tended to only rate a few messages, this approach to downsampling is likely more unstable. Therefore, these analyses are supplementary and not reported in the manuscript.
+
+## correlations {.tabset}
+### descriptives {.tabset}
+Describe the correlations between self and social relevance by study and content type.
+
+#### across content
+```{r}
+cors_spread = merged %>%
+  ungroup() %>%
+  select(study, SID, msg_rel_self, msg_rel_social) %>%
+  unique()
+
+cors = cors_spread %>%
+  nest(-c(study, SID)) %>%
+  mutate(test = map(data, possibly(~ cor.test(.$msg_rel_self, .$msg_rel_social), otherwise = NULL))) %>%
+  filter(!test == "NULL") %>%
+  mutate(coefs = map(test,
+                     broom::tidy,
+                     conf.int = TRUE,
+                     conf.level = .95)) %>% 
+  unnest(coefs, .drop = TRUE) %>%
+  mutate_if(is.numeric, round, 2)
+
+cors %>%
+  group_by(study) %>%
+  summarize(`mean correlation` = mean(estimate, na.rm = TRUE),
+            `sd correlation` = sd(estimate, na.rm = TRUE),
+            min = min(estimate, na.rm = TRUE),
+            max = max(estimate, na.rm = TRUE)) %>%
+  mutate(`range correlation` = sprintf("%.2f, %.2f", min, max)) %>%
+  select(-min, -max) %>%
+  kable(digits = 2) %>%
+  kableExtra::kable_styling()
+```
+
+### plot
+```{r, fig.width=8, fig.height=5}
+cors %>%
+  arrange(study, SID) %>%
+  mutate(item = row_number(),
+         V1 = sprintf("self_%s", row_number()),
+         V2 = sprintf("social_%s", row_number())) %>%
+  ggplot(aes(item, estimate, color = study)) +
+  geom_point() +
+  geom_hline(yintercept = .7) +
+  scale_color_manual(values = palette) +
+  labs(x = "\nmessage number", y = "correlation between\nself and social relevance\n") +
+  plot_aes +
+  theme(legend.text = element_text(size = 11))
+```
+
+### number of messages per study with < .7 correlation
+```{r}
+data_lower_cors = cors %>%
+  filter(estimate < .7)
+
+total_n = merged %>%
+  ungroup() %>%
+  select(study, SID) %>%
+  unique() %>%
+  group_by(study) %>%
+  summarize(`total n` = n())
+
+data_lower_cors %>%
+  group_by(study) %>%
+  summarize(n = n()) %>%
+  left_join(., total_n) %>%
+  mutate(percent = (n / `total n`) * 100) %>%
+  kable(digits = 2) %>%
+  kableExtra::kable_styling()
+```
+
+## downsampled mega-analysis {.tabset}
+Estimate the mega-analysis model in the downsampled dataset.
+
+### run model
+```{r}
+data_downsample = merged %>%
+  filter(SID %in% data_lower_cors$SID)
+
+model = lmerTest::lmer(msg_share_std ~ 0 + msg_rel_self_between*sharing_type +
+                                 msg_rel_self_within*sharing_type +
+                                 msg_rel_social_between*sharing_type +
+                                 msg_rel_social_within*sharing_type +
+                                 (1 + msg_rel_self_within + msg_rel_social_within | SID) +
+                                 (1 + msg_rel_self_within + msg_rel_social_within | item),
+                               data = data_downsample,
+                       control = lmerControl(optimizer = "bobyqa"))
+
+car::vif(model)
+```
+
+### plot
+```{r, fig.width=10, fig.height=6}
+predicted = ggeffects::ggpredict(model, c("msg_rel_self_between [-3:3]", "sharing_type")) %>%
+  data.frame() %>%
+  mutate(type = "self_between") %>%
+  bind_rows(ggeffects::ggpredict(model, c("msg_rel_self_within [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "self_within")) %>%
+  bind_rows(ggeffects::ggpredict(model, c("msg_rel_social_between [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "social_between")) %>%
+  bind_rows(ggeffects::ggpredict(model, c("msg_rel_social_within [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "social_within"))
+
+points = data_downsample %>%
+  select(-group) %>%
+  rename("group" = sharing_type,
+         "predicted" = msg_share_std) %>%
+  select(study, SID, group, predicted, contains("within"), contains("between")) %>%
+  gather(type, x, contains("msg")) %>%
+  mutate(type = gsub("msg_rel_", "", type),
+         group = ifelse(group == 0, "broadcast", "narrowcast")) %>%
+  extract(type, c("variable", "type"), "(.*)_(.*)") %>%
+  filter(x < 3 & x > -3)
+
+(fig3_alt = predicted %>%
+  mutate(group = ifelse(group == 0, "broadcast", "narrowcast")) %>%
+  extract(type, c("variable", "type"), "(.*)_(.*)") %>%
+  ggplot(aes(x, predicted, color = group, fill = group, linetype = type)) +
+  geom_point(data = points, aes(x, predicted), alpha = .02, size = .25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .2, color = NA) +
+  geom_line(size = 1) +
+  facet_grid(~variable) +
+  scale_color_manual(name = "", values = palette_sharing) +
+  scale_fill_manual(name = "", values = palette_sharing) +
+  scale_linetype_manual(name = "", values = c("solid", "dotted")) +
+  guides(linetype = guide_legend(override.aes = list(fill = NA))) +
+  labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
+  plot_aes  +
+  theme(legend.position = "top"))
+```
+
+### model summary table
+```{r, fig.width=10, fig.height=4.5}
+model %>%
+  broom.mixed::tidy(conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  rename("SE" = std.error,
+         "t" = statistic,
+         "p" = p.value) %>%
+  select(-group, -effect) %>%
+  mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
+  mutate(term = gsub(":", " x ", term),
+         term = gsub("msg_", "", term),
+         term = gsub("_", " ", term),
+         term = gsub("within", "within", term),
+         term = gsub("between", "between", term),
+         term = gsub("rel self", "self relevance", term),
+         term = gsub("rel social", "social relevance", term),
+         term = gsub("sharing type", "sharing type (narrowcast)", term),
+         p = ifelse(p < .001, "< .001",
+                    ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
+         `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
+  select(term, `b [95% CI]`, df, t, p) %>%
+  kable()  %>%
+  kable_styling()
+```

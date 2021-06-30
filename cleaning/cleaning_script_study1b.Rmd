@@ -1,0 +1,475 @@
+---
+title: "Study 1b data cleaning"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script cleans the raw data from Study 1b.
+
+# load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(knitr)) {
+  install.packages('knitr')
+}
+if (!require(DT)) {
+  install.packages('DT')
+}
+```
+
+# load and tidy data
+* Remove participants if they:
+    * Failed the screener
+    * Attention check
+* The survey key is located [here](https://upenn.box.com/s/1s8btcu3wo4ylcr4i61flk0t8u3ect0h)
+* The message stimuli can be found [here](https://upenn.box.com/s/h3vhnqbdmp383rvahnaalas20cqz7u5g)
+
+Note that the MIDs have been scrambled in the raw qualtrics data to deidentify them. Scrambling was conducted using the following code:
+
+```
+read.csv("covid19_study1_pilot2_qualtrics.csv", stringsAsFactors = FALSE) %>% 
+  mutate(MID = stringi::stri_rand_shuffle(MID)) %>%
+  write.csv("covid19_study1_pilot2_qualtrics.csv", row.names = FALSE)
+```
+This code tidies the raw data and outputs a dataframe in the long format with the following columns:
+
+`study` = study name  
+`condition` = experimental group (no message control, message control, norm, autonomous, mocking)  
+`survey_name` = name of the survey or question category (e.g. intentions or SES)  
+`item` = individual survey item (or message rating) name  
+`value` = response or rating  
+
+```{r}
+# load state codes
+states = read.csv("state_codes.csv", stringsAsFactors = FALSE) %>%
+  mutate(state_code = as.character(state_code))
+
+# load message info
+message_info = read.csv("../../../covid19-message-framing-private/covid19_study1_pilot2/message_info.csv", stringsAsFactors = FALSE) %>%
+  rename("message_text" = Message..link.or.text.) %>%
+  mutate(condition = gsub(" ", "", condition),
+         condition = tolower(condition),
+         condition = ifelse(condition == "control", "message control",
+                     ifelse(condition == "Descriptivenorm", "norm",
+                     ifelse(condition == "Humor(encouraging)", "encouraging",
+                     ifelse(condition == "Humor(mocking)", "mocking", condition))))) %>%
+  filter(condition %in% c("control", "autonomous", "norm", "encouraging")) %>%
+  mutate(message = sprintf("msg_%02d", as.numeric(image.number))) %>%
+  filter(message %in% c("msg_06", "msg_07", "msg_08", "msg_09", "msg_10", 
+                        "msg_12", "msg_15", "msg_17", "msg_18", "msg_20", 
+                        "msg_23", "msg_24", "msg_25", "msg_31", "msg_32")) %>%
+  mutate(behavior = "social_distancing") %>%
+  select(condition, message, message_text, behavior)
+
+# load and tidy survey
+surveys = read.csv("../../../covid19-message-framing-private/covid19_study1_pilot2/covid19_study1_pilot2_qualtrics.csv", stringsAsFactors = FALSE) %>%
+  slice(3:n()) %>%
+  filter(!DistributionChannel == "preview") %>% # remove preview responses
+  filter(!mturk_code == "") %>% # remove participants who failed screener
+  filter(!MID == "" | StartDate == "") %>% # remove test responses
+  rename("dehumanization_1" = prejudice_10, # rename slider variables and state
+         "dehumanization_2" = prejudice_11,
+         "dehumanization_3" = prejudice_12,
+         "dehumanization_4" = prejudice_13,
+         "dehumanization_5" = prejudice_14,
+         "dehumanization_6" = prejudice_15,
+         "dehumanization_7" = prejudice_16,
+         "dehumanization_8" = prejudice_17,
+         "dehumanization_9" = prejudice_18,
+         "dehumanization_10" = prejudice_19,
+         "stress_childcare" = stress_childcare_1,
+         "state_code" = state) %>%
+  left_join(., states, by = "state_code") %>% # replace state code with name
+  select(-state_code) %>%
+  mutate(SID = sprintf("s%03d", row_number())) %>% # create unique SID
+  gather(var, val, starts_with("X")) %>%
+  extract(var, c("message", "condition", "question"), "X([0-9]+)_(.*)_(msg.*)", remove = FALSE) %>% #rename conditions
+  mutate(group = ifelse(group == "norms", "norm", group),
+         condition = ifelse(condition == "a", "autonomous",
+                     ifelse(condition == "ni", "norm-i",
+                     ifelse(condition == "nm", "norm-most",
+                     ifelse(condition == "nw", "norm-we",
+                     ifelse(condition == "c", "control", 
+                     ifelse(condition == "l", "controlling",
+                     ifelse(condition == "hpm", "mocking-paired",
+                     ifelse(condition == "hpe", "encouraging-paired",
+                     ifelse(condition == "hum", "mocking-unpaired",
+                     ifelse(condition == "hue", "encouraging-unpaired", condition)))))))))),
+         message = ifelse(grepl("norm-i", condition), # recode messages to match those in message_info.csv
+                          recode(message, "1" = "06", "2" = "07", "3" = "10", "4" = "12", "5" = "24"), 
+                   ifelse(grepl("norm-we", condition),
+                          recode(message, "1" = "09", "2" = "15", "3" = "17", "4" = "25", "5" = "32"),
+                   ifelse(grepl("norm-most", condition),
+                          recode(message, "1" = "08", "2" = "18", "3" = "20", "4" = "23", "5" = "31"),
+                   ifelse(grepl("paired", condition),
+                          recode(message, "1" = "07", "2" = "08", "3" = "12", "4" = "15", "5" = "17", "6" = "31"),
+                   ifelse(grepl("mocking-unpaired", condition),
+                          recode(message, "1" = "06", "2" = "07", "3" = "09", "4" = "10-1", "5" = "10-1", "6" = "18", "7" = "25"),
+                   ifelse(grepl("encouraging-unpaired", condition),
+                          recode(message, "1" = "08", "2" = "17", "3" = "20-1", "4" = "20-2", "5" = "24", "6" = "31"),
+                          recode(message, "1" = "06", "4" = "07", "5" = "08",
+                                   "6" = "09", "7" = "10", "8" = "12",
+                                   "9" = "15", "10" = "17", "11" = "18",
+                                   "12" = "20", "13" = "23", "14" = "24",
+                                   "15" = "25", "16" = "31", "17" = "32"))))))),
+         var = sprintf("%s_%s_%s", condition, question, message)) %>%
+  select(-c(message, condition, question, MID), -contains(".stims")) %>%
+  spread(var, val) %>%
+  gather(item, value, -c(SID, group)) %>%
+  mutate(value = ifelse(value == "", NA, value)) %>%
+  extract(item, "survey_name", "(.*)_[0-9]+", remove = FALSE) %>%
+  mutate(survey_name = ifelse(is.na(survey_name), item, survey_name)) %>%
+  filter(!(group %in% c("encouraging", "mocking", "controlling") & grepl("31", item))) # exclude this item because it was presented as a static image instead of a gif
+
+# get completed messages and extract condition
+messages = surveys %>%
+  filter(grepl("msg", item)) %>%
+  filter(!is.na(value)) %>%
+  extract(item, "condition", "(.*)_msg.*", remove = FALSE) %>%
+  mutate(item = gsub("(.*)_msg", "msg", item),
+         survey_name = gsub("(.*)_msg", "msg", survey_name),
+         condition = ifelse(condition == "control", "message control", condition))
+
+# get condition information
+conditions = messages %>%
+  select(SID, condition) %>%
+  unique()
+
+# replace messages 
+surveys_merged = surveys %>%
+  filter(!grepl("msg", item)) %>% # remove message ratings
+  bind_rows(messages) %>% # replace message ratings with cleaned message ratings
+  group_by(SID) %>%
+  fill(condition, .direction = "up") %>%
+  mutate(condition = ifelse(is.na(condition), "no message control", condition),
+         study = "study1_pilot2") %>% # rename as no message control
+  select(study, group, condition, SID, survey_name, item, value)
+
+# spread to wide format
+surveys_merged_wide = surveys_merged %>%
+  select(-survey_name) %>%
+  spread(item, value)
+```
+
+Number of participants before exclusions = `r nrow(surveys_merged_wide)`
+
+## quality checks
+### failed checks
+We're ignoring the COVID question about flattening the curve. 
+
+```{r}
+# identify failed attention checks
+failed_attn = surveys %>%
+  filter(item == "attention_2" & !grepl("How do you feel about social media?", value)) %>%
+  select(SID, value) %>%
+  unique()
+
+# identify failed knowledge checks
+failed_covid_qs = surveys %>%
+  select(-survey_name) %>%
+  filter(grepl("knowledge|^code", item)) %>%
+  spread(item, value) %>%
+  gather(item, value, starts_with("knowledge")) %>%
+  mutate(failed = ifelse(item == "knowledge_covid" & code %in% c("21910", "15429", "60889"), 1,
+                  #ifelse(item == "knowledge_flatten" & code %in% c("56468", "68741", "53534", "15429", "99450", "31936", "43779", "60889"), 1, 
+                  ifelse(item == "knowledge_social" & code %in% c("56468", "73260", "15429", "43779", "60889"), 1, 0))) %>%
+  select(SID, item, failed) %>%
+  unique() %>%
+  group_by(SID) %>%
+  summarize(n_knowledge_failed = sum(failed))
+
+failed_covid_subs = failed_covid_qs %>%
+  filter(n_knowledge_failed > 0)
+
+# identify failed English checks
+failed_english = surveys %>%
+  filter(item == "english") %>%
+  filter(!grepl("cou|demonstrat|demonstators|they", tolower(value)) | SID %in% c("s174", "s032", "s146", "s213")) %>% #these participants copied the sentence
+  select(SID, value) %>%
+  unique()
+
+# print number of failed checks
+failed = surveys %>% 
+  select(SID) %>% 
+  unique() %>% 
+  mutate(failed_attention = ifelse(SID %in% failed_attn$SID, 1, 0), 
+         failed_english = ifelse(SID %in% failed_english$SID, 1, 0), 
+         failed_covid_qs = ifelse(SID %in% failed_covid_subs$SID, 1, 0),
+         `failed english & attention` = ifelse(failed_attention == 1 & failed_english == 1, 1, 0),
+         `failed english & covid qs` = ifelse(failed_english == 1 & failed_covid_qs == 1, 1, 0),
+         `failed attention & covid qs` = ifelse(failed_attention == 1 & failed_covid_qs == 1, 1, 0),
+         `failed attention & covid & english` = ifelse(failed_attention == 1 & failed_covid_qs == 1 & failed_english == 1, 1, 0),
+         `failed at least one check`  = ifelse(failed_attention == 1 | failed_covid_qs == 1 | failed_english, 1, 0))
+
+failed %>%
+  gather(check, val, contains("fail")) %>% 
+  filter(val == 1) %>% 
+  group_by(check) %>% 
+  summarize(n = n(),
+            `%` = round(n / nrow(failed_covid_qs) * 100, 1)) %>%
+  arrange(desc(n)) %>%
+  kable(format = "pandoc")
+```
+
+### durations
+```{r, fig.width = 12, fig.height=4}
+durations = surveys %>%
+  filter(item == "Duration..in.seconds.") %>%
+  mutate(duration_mins = as.numeric(value) / 60,
+         less_than_10_mins = ifelse(duration_mins < 10, 1, 0))
+
+dur_plot_data = durations %>%
+  mutate(n = n(),
+         median = median(duration_mins, na.rm = TRUE),
+         sd3 = median + (3 * sd(duration_mins, na.rm = TRUE)),
+         slow = ifelse(duration_mins > (median + sd3), 1, 0))
+
+dur_plot_data %>%
+  ggplot(aes(duration_mins)) +
+  geom_histogram(alpha = .5) +
+  geom_freqpoly() +
+  geom_vline(aes(xintercept = median)) +
+  geom_vline(aes(xintercept = sd3), linetype = "dotted") +
+  annotate("text", label = sprintf("Median = %s", round(unique(dur_plot_data$median), 1)), x = unique(dur_plot_data$median) + 10, y = 75) + 
+  annotate("text", label = sprintf("3 SD = %s", round(unique(dur_plot_data$sd3), 1)), x = unique(dur_plot_data$sd3) + 10, y = 75) + 
+  labs(x = "duration (minutes)") +
+  theme_minimal()
+```
+
+#### print survey data for participants with durations < 10 mins
+```{r}
+fast_subs = durations %>%
+  filter(less_than_10_mins == 1)
+
+surveys_merged_wide %>% 
+  filter(SID %in% fast_subs$SID) %>%
+  left_join(., select(durations, SID, duration_mins)) %>%
+  select(SID, duration_mins, everything()) %>%
+  select(-study, -condition) %>%
+  mutate(duration_mins = round(duration_mins, 1)) %>%
+  arrange(duration_mins) %>%
+  DT::datatable(rownames = FALSE, extensions = 'FixedColumns', options = list(scrollX = TRUE,
+                                                                              scrollY = TRUE,
+                                                                              fixedColumns = list(leftColumns = 2)))
+```
+
+### invariance
+Goal is to identify participants who are responding the same way across all items within a survey
+
+* Calculate the SD for each surevy for each individual
+* Single item scales are not included
+* If SD = 0, code as invariant and calculate the percentage of invariant surveys for each participant
+
+```{r, fig.width = 8}
+invariance = surveys %>%
+  select(SID, survey_name, value) %>%
+  group_by(SID, survey_name) %>%
+  summarize(sd_survey = sd(as.numeric(value), na.rm = TRUE)) %>%
+  filter(!is.na(sd_survey)) %>%
+  group_by(SID) %>%
+  mutate(completed_variance = ifelse(!(is.na(sd_survey) | is.nan(sd_survey)), 1, 0),
+         n_survey = sum(completed_variance, na.rm = TRUE),
+         invariant = ifelse(sd_survey == 0, 1, 0),
+         sum_invariant = sum(invariant, na.rm = TRUE),
+         percent_surveys_invariant = (sum_invariant / n_survey ) * 100) %>%
+  select(SID, survey_name, sd_survey, percent_surveys_invariant) %>%
+  ungroup() %>%
+  select(SID, percent_surveys_invariant) %>%
+  unique() %>%
+  mutate(median = median(percent_surveys_invariant, na.rm = TRUE),
+         uppersd2 = median + (2 * sd(percent_surveys_invariant, na.rm = TRUE)),
+         uppersd3 = median + (3 * sd(percent_surveys_invariant, na.rm = TRUE)),
+         greater_than_2sd_invariance = ifelse(percent_surveys_invariant > uppersd2, 1, 0),
+         greater_than_3sd_invariance = ifelse(percent_surveys_invariant > uppersd3, 1, 0))
+
+invariance %>%
+  ggplot(aes(percent_surveys_invariant)) +
+    geom_histogram(alpha = .5) +
+    geom_freqpoly() +
+    geom_vline(aes(xintercept = median)) +
+    annotate("text", label = sprintf("Median = %s", round(unique(invariance$median), 1)), 
+             x = unique(invariance$median) + 5, y = 40, size = 2.5) + 
+    geom_vline(aes(xintercept = uppersd2), linetype = "dotted") +
+    annotate("text", label = sprintf("+2 SD = %s", round(unique(invariance$uppersd2), 1)), 
+             x = unique(invariance$uppersd2) + 5, y = 40, size = 2.5) + 
+    geom_vline(aes(xintercept = uppersd3), linetype = "dotted") +
+    annotate("text", label = sprintf("+3 SD = %s", round(unique(invariance$uppersd3), 1)), 
+             x = unique(invariance$uppersd3) + 5, y = 40, size = 2.5) + 
+    scale_x_continuous(breaks = seq(0, 100, 10)) +
+    scale_y_continuous(breaks = seq(0, 140, 20)) +
+    labs(x = "percent invariance across surveys") +
+    theme_minimal()
+```
+
+#### print survey data for participants with invariance > 2 SDs from the median
+* For a quick check of invariance, look at the agency scale: agency_2 = reverse-coded
+
+```{r}
+invariant_subs = invariance %>%
+  filter(greater_than_2sd_invariance == 1)
+
+surveys_merged_wide %>% 
+  filter(SID %in% invariant_subs$SID) %>%
+  left_join(., select(invariance, SID, percent_surveys_invariant)) %>%
+  select(SID, percent_surveys_invariant, everything()) %>%
+  select(-study, -condition) %>%
+  mutate(percent_surveys_invariant = round(percent_surveys_invariant, 1)) %>%
+  arrange(desc(percent_surveys_invariant)) %>%
+  rename("% invariant" = percent_surveys_invariant) %>%
+  DT::datatable(rownames = FALSE, extensions = 'FixedColumns', options = list(scrollX = TRUE,
+                                                                              scrollY = TRUE,
+                                                                              fixedColumns = list(leftColumns = 2)))
+```
+
+#### print survey data for participants with invariance > 3 SDs from the median
+* For a quick check of invariance, look at the agency scale: agency_2 = reverse-coded
+
+```{r}
+invariant_subs = invariance %>%
+  filter(greater_than_3sd_invariance == 1)
+
+surveys_merged_wide %>% 
+  filter(SID %in% invariant_subs$SID) %>%
+  left_join(., select(invariance, SID, percent_surveys_invariant)) %>%
+  select(SID, percent_surveys_invariant, everything()) %>%
+  select(-study, -condition) %>%
+  mutate(percent_surveys_invariant = round(percent_surveys_invariant, 1)) %>%
+  arrange(desc(percent_surveys_invariant)) %>%
+  rename("% invariant" = percent_surveys_invariant) %>%
+  DT::datatable(rownames = FALSE, extensions = 'FixedColumns', options = list(scrollX = TRUE,
+                                                                              fixedColumns = list(leftColumns = 1)))
+```
+
+### combine quality indicators
+Quality indicators:
+
+* Failed attention, English, and COVID-10 knowledge checks
+* Duration < 10 mins
+* Invariance > 3 SDs from the median
+
+```{r}
+quality_check_all = durations %>%
+  select(SID, duration_mins, less_than_10_mins) %>%
+  left_join(., select(invariance, SID, percent_surveys_invariant, greater_than_3sd_invariance)) %>%
+  left_join(., select(failed, SID, failed_attention, failed_english, failed_covid_qs)) %>%
+  gather(var, val, contains("fail"), contains("than")) %>%
+  group_by(SID) %>%
+  mutate(n_indicators = sum(val),
+         duration_mins = round(duration_mins, 1),
+         percent_surveys_invariant = round(percent_surveys_invariant, 1)) %>%
+  spread(var, val) %>% 
+  filter(n_indicators > 0) %>%
+  arrange(desc(n_indicators)) 
+
+quality_check_notime = durations %>%
+  select(SID, duration_mins) %>%
+  left_join(., select(invariance, SID, percent_surveys_invariant, greater_than_3sd_invariance)) %>%
+  left_join(., select(failed, SID, failed_attention, failed_english, failed_covid_qs)) %>%
+  gather(var, val, contains("fail"), contains("than")) %>%
+  group_by(SID) %>%
+  mutate(n_indicators = sum(val),
+         duration_mins = round(duration_mins, 1),
+         percent_surveys_invariant = round(percent_surveys_invariant, 1)) %>%
+  spread(var, val) %>% 
+  filter(n_indicators > 0) %>%
+  arrange(desc(n_indicators)) 
+
+quality_check_failed = failed %>%
+  filter(`failed at least one check` == 1)
+
+quality_check_all %>%
+  DT::datatable(filter = "top", rownames = FALSE, extensions = 'FixedColumns', 
+                options = list(scrollX = TRUE, fixedColumns = list(leftColumns = 2)))
+```
+
+Excluding all these participants results in excluding `r round(nrow(quality_check_all) / nrow(durations) * 100, 1)`% of participants (n = `r nrow(quality_check_all)`)
+
+Removing the duration as an exclusion criteria results in excluding `r round(nrow(quality_check_notime) / nrow(durations) * 100, 1)`% of participants (n = `r nrow(quality_check_notime)`)
+
+Just excluding based on failed checks results in excluding `r round(nrow(quality_check_failed) / nrow(durations) * 100, 1)`% of participants (n = `r nrow(quality_check_failed)`)
+
+# remove participants who did not see messages
+```{r}
+no_message_subs = surveys_merged %>%
+  filter(condition == "no message control")
+
+quality_check_notime = quality_check_notime %>%
+  filter(!SID %in% no_message_subs$SID) 
+```
+
+# exclude participants
+
+Number of participants before exclusions = `r nrow(filter(surveys_merged_wide, !SID %in% no_message_subs$SID))`  
+Number of participants after exclusions = `r nrow(filter(surveys_merged_wide, !SID %in% quality_check_notime$SID & !SID %in% no_message_subs$SID))`  
+Number excluded = `r nrow(quality_check_notime)`
+
+Participants are excluded for:
+
+* Failing the attention check (N = `r nrow(filter(quality_check_notime, n_indicators == 1 & failed_attention == 1))`)  
+* Failing the English comprehension check (N = `r nrow(filter(quality_check_notime, n_indicators == 1 & failed_english== 1))`) 
+* Failing one or more of the COVID-19 questions (only COVID-19 and social distancing items) (N = `r nrow(filter(quality_check_notime, n_indicators == 1 & failed_covid_qs == 1))`)  
+* Having invariance > 3 SDs from the median across people (N = `r nrow(filter(quality_check_notime, n_indicators == 1 & greater_than_3sd_invariance == 1))`)
+* More than one of these issues (N = `r nrow(filter(quality_check_notime, n_indicators > 1))`)
+
+```{r}
+surveys_clean = surveys_merged %>%
+  filter(!SID %in% no_message_subs$SID) %>% # remove participants who saw no messages
+  filter(!SID %in% quality_check_notime$SID) %>% # exclude participants
+  select(study, group, condition, SID, survey_name, item, value)
+```
+
+# summarize condition and survey ns
+```{r}
+surveys_clean %>%
+  group_by(group) %>%
+  select(SID, group) %>%
+  unique() %>%
+  summarize(n = n()) %>%
+  kable(format = "pandoc")
+
+surveys_clean %>%
+  group_by(condition) %>%
+  select(SID, condition) %>%
+  unique() %>%
+  summarize(n = n()) %>%
+  kable(format = "pandoc")
+
+surveys_clean %>%
+  filter(!is.na(value)) %>%
+  group_by(survey_name) %>%
+  select(SID, survey_name) %>%
+  unique() %>%
+  summarize(n = n()) %>%
+  kable(format = "pandoc")
+```
+
+# write csvs
+```{r}
+write.csv(surveys_clean, "../data/study1b_clean_long.csv", row.names = FALSE)
+```
+

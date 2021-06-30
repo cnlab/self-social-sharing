@@ -1,0 +1,975 @@
+---
+title: "Specification curve analyses"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen = 999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+
+In these analyses, we assess the robustness of the relationships from the mega-analysis using specification curve analysis.
+
+# prep data {.tabset}
+First, we load the relevant packages and data, and define the plotting aesthetics.
+
+## load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(lmerTest)) {
+  install.packages('lmerTest')
+}
+if (!require(purrr)) {
+  install.packages('purrr')
+}
+if (!require(furrr)) {
+  install.packages('furrr')
+}
+devtools::install_github("dcosme/specr", ref = "plotmods")
+```
+
+## define aesthetics
+```{r}
+palette = c("#e64626", "#ffb800", "#00A896","#1985a1", "#165F8D", "#5A69AF", "#393993")
+palette_sharing = c("#4c5c68", "#B8B3BE")
+palette_relevance = c("#A42B13", "#EE6C4D", "#3D5A80", "#98C1D9")
+palette_decisions = c("#3B9AB2", "#EBCC2A", "#F21A00")
+
+plot_aes = theme_minimal() +
+  theme(legend.position = "top",
+        legend.text = element_text(size = 12),
+        text = element_text(size = 16, family = "Futura Medium"),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        axis.ticks.y = element_blank())
+```
+
+## load and merge data
+```{r}
+# demographics
+study1_demo = read.csv("../data/study1_demo.csv", stringsAsFactors = FALSE)
+
+study2_demo = read.csv("../data/study2_demo.csv", stringsAsFactors = FALSE)
+
+study3_demo = read.csv("../data/study3_demo.csv", stringsAsFactors = FALSE)
+
+study4_demo = read.csv("../data/study4_demo.csv", stringsAsFactors = FALSE)
+
+study5_demo = read.csv("../data/study5_demo.csv", stringsAsFactors = FALSE)
+
+study6_demo = read.csv("../data/study6_demo.csv", stringsAsFactors = FALSE)
+
+merged_demo = bind_rows(study1_demo, study2_demo, study3_demo, study4_demo, study5_demo, study6_demo) %>%
+  spread(item, value) %>%
+  select(-gender_4_TEXT, -race_self) %>%
+  rename("SES_degree" = `highest degree completed`,
+         "SES_income" = `household income`,
+         "hispanic_latinx" = `Hispanic or Latinx`) %>%
+  mutate(age = as.numeric(age))
+
+# load and tidy study data
+study1 = read.csv("../data/study1.csv", stringsAsFactors = FALSE)
+
+study2 = read.csv("../data/study2.csv", stringsAsFactors = FALSE)
+
+study3 = read.csv("../data/study3.csv", stringsAsFactors = FALSE)
+
+study4 = read.csv("../data/study4.csv", stringsAsFactors = FALSE)
+
+study5 = read.csv("../data/study5.csv", stringsAsFactors = FALSE)
+
+study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE)
+
+merged = bind_rows(study1, study2, study3, study4, study5, study6) %>%
+  group_by(study, sharing_type) %>%
+  mutate(msg_share_std = scale(msg_share, scale = TRUE, center = TRUE),
+         medium = ifelse(grepl("1|2|3", study), "social media", "newspaper")) %>% 
+  left_join(., merged_demo) %>%
+  mutate(gender = as.factor(gender),
+         hispanic_latinx = as.factor(hispanic_latinx),
+         race = ifelse(race == "Hispanic" | race == "Latino", NA, race),
+         race = as.factor(race),
+         SES_degree = factor(SES_degree, ordered = TRUE,
+                             levels = c("Less than high school", "High school graduate (diploma)",
+                                        "High school graduate (GED)",
+                                        "Some college (1-4 years, no degree)",
+                                        "Associate's degree (including occupational or academic degrees)",
+                                        "Bachelor's degree (BA, BS, etc)",
+                                        "Master's degree (MA, MS, MENG, MSW, etc)",
+                                        "Professional school degree (MD, DDC, JD, etc)",
+                                        "Doctorate degree (PhD, EdD, etc)")),
+         SES_income = factor(SES_income, ordered = TRUE,
+                             levels = c("Less than $5,000",
+                                        "$5,000 through $11,999",
+                                        "$12,000 through $15,999",
+                                        "$16,000 through $24,999",
+                                        "$25,000 through $34,999",
+                                        "$35,000 through $49,999",
+                                        "$50,000 through $74,999",
+                                        "$75,000 through $99,999",
+                                        "$100,000 and greater")))
+```
+
+# prep for SCA {.tabset}
+## define functions
+These functions are adapted from the [specr package](https://masurp.github.io/specr/).
+
+```{r}
+# specr functions
+convert_formula = function(x, y, controls, random_effects, ...) {
+	if (controls == "no covariates") {
+		paste(y, "~", x, "+", random_effects)    
+	} else {
+		paste(y, "~", x, "+", controls, "+", random_effects)
+	}
+}
+
+run_spec <- function(specs, df, conf.level, keep.results = FALSE) {
+
+  # dependencies
+  require(dplyr)
+  require(purrr)
+  
+
+  results <- specs %>%
+    mutate(formula = pmap(., convert_formula)) %>%
+    tidyr::unnest(formula) %>%
+    mutate(res = map2(model, formula, possibly(~ do.call(.x, list(data = df,
+                                                                  formula = .y,
+                                                                  control = lmerControl(optimizer = "bobyqa"))),
+                                               otherwise = NULL))) %>%
+    filter(!res == "NULL") %>%
+    mutate(coefs = map(res,
+                       broom.mixed::tidy,
+                       conf.int = TRUE,
+                       conf.level = .95),
+           obs = map(res, nobs)) %>%
+    tidyr::unnest(coefs) %>%
+    tidyr::unnest(obs) %>%
+    filter(term == x) %>%
+    select(-term)
+
+  if (isFALSE(keep.results)) {
+    results <- results %>%
+      select(-res)
+  }
+
+  return(results)
+}
+
+create_subsets <- function(df, subsets) {
+
+  # dependencies
+  require(dplyr)
+
+  subsets %>%
+    stack %>%
+    purrr::pmap(~ filter(df, get(as.character(..2)) == ..1) %>%
+                  mutate(filter = paste(..2, "=", ..1)))
+}
+```
+
+## tidy data
+Define relevant variables and subset this data for modeling.
+
+```{r}
+# specify model components and variables
+dvs = "msg_share_std"
+ivs = c("msg_rel_self_between", "msg_rel_self_within", "msg_rel_social_between", "msg_rel_social_within")
+control_vars = c("age", "gender", "SES_degree", "SES_income", "race", "hispanic_latinx")
+model = "lmer"
+random_effects = "(1 + msg_rel_self_within + msg_rel_social_within | SID) + (1 | item)"
+conf_level = .95
+  
+# generate all combinations of control variables
+controls = do.call(c, lapply(1:length(control_vars), function(x) combinat::combn(control_vars, x, simplify = FALSE))) %>%
+	purrr::map(function(x) paste(x, collapse = " + ")) %>%
+	unlist() %>%
+	append(., "") # no covariates
+
+# get relevant variables
+model_df = merged %>%
+  select(study, SID, item, content, sharing_type, medium, !!dvs, !!ivs, !!control_vars) %>%
+  mutate(sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast"))
+```
+
+## generate model specifications from model components
+```{r}
+models = expand.grid(x = ivs,
+										 y = dvs,
+										 model = model,
+										 controls = controls,
+										 control_ivs = paste(ivs, collapse = " _ "),
+										 random_effects = random_effects, stringsAsFactors = FALSE) %>%
+  mutate(control_ivs = str_remove(control_ivs, x),
+         control_ivs = str_replace(control_ivs, "^ _ ", ""),
+         control_ivs = str_replace(control_ivs, " _ $", ""),
+         control_ivs = str_replace(control_ivs, " _  _ ", " _ "),
+         control_ivs = gsub(" _ ", " + ", control_ivs, fixed = TRUE),
+         controls = ifelse(controls == "", control_ivs,
+                           sprintf("%s + %s", control_ivs, controls))) %>%
+  select(-control_ivs) %>%
+  as_tibble()
+```
+
+## create subsets
+Create subsets of the data to estimate the models within.
+
+```{r}
+# define subsets
+subsets_1 = list(content = "covid",
+                 sharing_type = "broadcast")
+               
+subsets_2 = list(sharing_type = unique(model_df$sharing_type),
+                 medium = unique(model_df$medium))
+               
+subsets_3 = list(content = unique(model_df$content),
+                 sharing_type = unique(model_df$sharing_type),
+                 medium = unique(model_df$medium))
+
+# broadcast covid
+subsets_1 = map(subsets_1, as.character)
+df_1 = subsets_1 %>%
+    cross %>%
+    map(~ create_subsets(subsets = .x, df = model_df) %>%
+          map(~ dplyr::select(.x, -filter)) %>%
+          reduce(dplyr::inner_join) %>%
+          dplyr::mutate(filter = paste(names(.x),
+                                       .x,
+                                       collapse = " & ",
+                                       sep = " = "))) %>%
+  Filter(function(x) nrow(x) > 0, .) # filter out empty dataframes
+
+# medium, sharing type
+subsets_2 = map(subsets_2, as.character)
+df_2 = subsets_2 %>%
+    cross %>%
+    map(~ create_subsets(subsets = .x, df = model_df) %>%
+          map(~ dplyr::select(.x, -filter)) %>%
+          reduce(dplyr::inner_join) %>%
+          dplyr::mutate(filter = paste(names(.x),
+                                       .x,
+                                       collapse = " & ",
+                                       sep = " = "))) %>%
+  Filter(function(x) nrow(x) > 0, .) %>% # filter out empty dataframes
+  Filter(function(x) sum(x$filter == "sharing_type = narrowcast & medium = social media") == 0, .)
+
+# combine subsets 1 and 2 
+df_12 = append(df_1, df_2)
+
+# content, medium, sharing type
+subsets_3 = map(subsets_3, as.character)
+df_3 = subsets_3 %>%
+    cross %>%
+    map(~ create_subsets(subsets = .x, df = model_df) %>%
+          map(~ dplyr::select(.x, -filter)) %>%
+          reduce(dplyr::inner_join) %>%
+          dplyr::mutate(filter = paste(names(.x),
+                                       .x,
+                                       collapse = " & ",
+                                       sep = " = "))) %>%
+  Filter(function(x) nrow(x) > 0, .) # filter out empty dataframes
+
+# divid df_3 into two subsets to reduce output file size
+subsetList <- function(myList, elementNames) {
+    lapply(elementNames, FUN=function(x) myList[[x]])
+}
+           
+df_3a = subsetList(df_3, 1:4)
+df_3b = subsetList(df_3, 5:9)
+```
+
+# run SCA {.tabset}
+## run models
+Run SCAs or load saved output from files.
+
+```{r}
+# df_12
+if (!file.exists("models/sca_output_12.RDS")) {
+  # setup parallelization with furrr
+  plan(multisession, workers = 10)
+  
+  # run SCA
+  output_12 = furrr::future_map_dfr(df_12, ~ run_spec(models, .x,
+                                                       conf.level = conf_level,
+                                                       keep.results = FALSE) %>%
+                          mutate(subsets = unique(.x$filter)))
+  # save output
+  saveRDS(output, "models/sca_output_12.RDS")
+
+} else {
+  
+  #load output
+  output_12 = readRDS("models/sca_output_12.RDS")
+}
+
+# df_3a
+if (!file.exists("models/sca_output_3a.RDS")) {
+  # setup parallelization with furrr
+  plan(multisession, workers = 10)
+  
+  # run SCA
+  output_3a = furrr::future_map_dfr(df_3a, ~ run_spec(models, .x,
+                                                       conf.level = conf_level,
+                                                       keep.results = FALSE) %>%
+                          mutate(subsets = unique(.x$filter)))
+  # save output
+  saveRDS(output, "models/sca_output_3a.RDS")
+
+} else {
+  # load output
+  output_3a = readRDS("models/sca_output_3a.RDS")
+}
+
+# df_3a
+if (!file.exists("models/sca_output_3b.RDS")) {
+  # setup parallelization with furrr
+  plan(multisession, workers = 10)
+  
+  # run SCA
+  output_3b = furrr::future_map_dfr(df_3b, ~ run_spec(models, .x,
+                                                       conf.level = conf_level,
+                                                       keep.results = FALSE) %>%
+                          mutate(subsets = unique(.x$filter)))
+  
+  # save output
+  saveRDS(output, "models/sca_output_3b.RDS")
+
+} else {
+  # load output
+  output_3b = readRDS("models/sca_output_3b.RDS")
+}
+```
+
+## tidy output
+```{r}
+output1 = bind_rows(output_12, output_3a, output_3b) %>%
+  select(-res) %>%
+  mutate(x = gsub("msg_rel_", "", x),
+         x = gsub("_", " ", x),
+         content = ifelse(grepl("covid", subsets), "COVID-19",
+                   ifelse(grepl("voting", subsets), "voting",
+                   ifelse(grepl("health", subsets), "health",
+                   ifelse(grepl("climate", subsets), "climate",
+                   ifelse(subsets == "sharing_type = broadcast & medium = social media", "COVID-19 & voting",
+                   ifelse(subsets == "sharing_type = broadcast & medium = newspaper", "COVID-19, health & climate",  
+                   ifelse(subsets == "sharing_type = narrowcast & medium = newspaper", "COVID-19 & climate", "all"))))))),
+         `COVID-19` = ifelse(grepl("COVID-19", content), "COVID-19", NA),
+         voting = ifelse(grepl("voting", content), "voting", NA),
+         health = ifelse(grepl("health", content), "health", NA),
+         climate = ifelse(grepl("climate", content), "climate", NA),
+         sharing = ifelse(grepl("broad", subsets), "broadcast",
+                  ifelse(grepl("narrow", subsets), "narrowcast", "all")),
+         medium = ifelse(grepl("media", subsets), "social media",
+                  ifelse(subsets == "content = covid & sharing_type = broadcast", "social media",
+                  ifelse(grepl("news", subsets), "newspaper", "all"))),
+         relevance = x,
+         controls = ifelse(grepl("age|SES|race|hispanic", controls), "controls", "no controls"),
+         subset = case_when(subsets == "content = covid & sharing_type = broadcast" ~ "10",
+                                   subsets == "sharing_type = broadcast & medium = social media" ~ "11",
+                                   subsets == "sharing_type = broadcast & medium = newspaper" ~ "12",
+                                   subsets == "sharing_type = narrowcast & medium = newspaper" ~ "13",
+                                   subsets == "content = covid & sharing_type = broadcast & medium = social media" ~ "1",
+                                   subsets == "content = voting & sharing_type = broadcast & medium = social media" ~ "4",
+                                   subsets == "content = voting & sharing_type = narrowcast & medium = social media" ~ "5",
+                                   subsets == "content = covid & sharing_type = broadcast & medium = newspaper" ~ "2",
+                                   subsets == "content = health & sharing_type = broadcast & medium = newspaper" ~ "6",
+                                   subsets == "content = climate & sharing_type = broadcast & medium = newspaper" ~ "8",
+                                   subsets == "content = covid & sharing_type = narrowcast & medium = newspaper" ~ "3",
+                                   subsets == "content = health & sharing_type = narrowcast & medium = newspaper" ~ "7",
+                                   subsets == "content = climate & sharing_type = narrowcast & medium = newspaper" ~ "9"))
+```
+
+# plot SCA {.tabset}
+## decisions
+This plot depicts the set of models run in each subset of the data. It is supplementary and does not appear in the manuscript.
+
+```{r}
+# define edges
+l1 = expand.grid(from = dvs, to = ivs) %>%
+  group_by(to) %>%
+  mutate(key = "relevance variables",
+         to = sprintf("%s_%s", to, row_number()))
+l2 = expand.grid(from = unique(l1$to), to = controls) %>%
+  group_by(to) %>%
+  mutate(key = "control variables",
+         to = sprintf("%s_%s", to, row_number()))
+edge_list = bind_rows(l1, l2)
+
+# plot
+decision_plot = igraph::graph_from_data_frame(edge_list)
+
+ggraph::ggraph(decision_plot, layout = 'dendrogram', circular = FALSE) + 
+  ggraph::geom_edge_diagonal(aes(color = key), strength = 0) +
+  ggraph::scale_edge_color_manual(name = "decision key", values = palette_decisions) +
+  theme_void() +
+  theme(legend.position = "top")
+```
+
+## define functions
+### modified specr functions
+These functions are adapted from the [specr package](https://masurp.github.io/specr/).
+
+```{r}
+format_results <- function(df, var, null = 0, desc = FALSE) {
+
+  # rank specs
+  if (isFALSE(desc)) {
+    df <- df %>%
+      dplyr::arrange(estimate)
+  } else {
+    df <- df %>%
+      dplyr::arrange(desc(estimate))
+  }
+
+  # create rank variable and color significance
+  df <- df %>%
+    dplyr::mutate(specifications = 1:n(),
+           color = case_when(conf.low > null ~ "black",
+                             conf.high < null ~ "black",
+                             TRUE ~ "darkgrey"))
+  return(df)
+}
+
+plot_choices <- function(df,
+                         var = .data$estimate,
+                         choices = c("x", "y", "model", "controls", "subsets"),
+                         desc = FALSE,
+                         null = 0,
+                         size = 3.35,
+                         alpha_values = c(1, 1),
+                         color_vars = NULL,
+                         palette = NULL,
+                         rename_controls = FALSE,
+                         ignore_vars = FALSE,
+                         collapse_content = FALSE) {
+
+  value <- key <- NULL
+
+  var <- enquo(var)
+  
+  if (collapse_content == TRUE) {
+  
+    df = df %>%
+      format_results(var = var, null = null, desc = desc) %>%
+      select(-content) %>%
+      gather(content_type, content, `COVID-19`, voting, health, climate) %>%
+      filter(!is.na(content)) %>%
+      select(-content_type)
+  
+  } else {
+    df = df %>%
+      format_results(var = var, null = null, desc = desc)
+  }
+
+  if (!is.null(color_vars)) {
+    color_num_key = df %>%
+      select(!!color_vars) %>%
+      unique() %>%
+      arrange(get(color_vars)) %>%
+      mutate(color_num = row_number())
+
+    data_df = df %>%
+      left_join(., color_num_key) %>%
+      mutate(controls = ifelse(grepl("[+]", controls), "all covariates", controls),
+             alpha = ifelse(color == "black", "yes", "no"),
+             color = sprintf("%s", eval(parse(text = "palette[color_num]")))) %>%
+      tidyr::gather(key, value, choices) %>%
+      mutate(key = ifelse(isFALSE(rename_controls) == FALSE & key == "controls", rename_controls, key),
+             value = ifelse(isFALSE(ignore_vars) == FALSE & value %in% ignore_vars, NA, value)) %>%
+      filter(!is.na(value)) %>%
+      unique() %>%
+      mutate(key = factor(key, levels=unique(key)))
+
+  } else {
+
+    data_df = df %>%
+      mutate(controls = ifelse(grepl("[+]", controls), "all covariates", controls)) %>%
+      tidyr::gather(key, value, choices) %>%
+      mutate(key = ifelse(isFALSE(rename_controls) == FALSE & key == "controls", rename_controls, key),
+             value = ifelse(isFALSE(ignore_vars) == FALSE & value %in% ignore_vars, NA, value),
+             alpha = "yes") %>%
+      filter(!is.na(value)) %>%
+      unique() %>%
+      mutate(key = factor(key, levels=unique(key)))
+  }
+
+  data_df %>%
+    ggplot(aes(x = .data$specifications,
+               y = .data$value,
+               color = .data$color)) +
+    geom_point(aes(x = .data$specifications,
+                   y = .data$value,
+                   alpha = alpha),
+               shape = 124,
+               size = size) +
+    scale_color_identity() +
+    scale_alpha_manual(values = alpha_values) +
+    theme_minimal() +
+    facet_grid(.data$key~1, scales = "free_y", space = "free_y") +
+    theme(
+      axis.line = element_line("black", size = .5),
+      legend.position = "none",
+      panel.spacing = unit(.75, "lines"),
+      axis.text = element_text(colour = "black"),
+      strip.text.x = element_blank()) +
+    labs(x = "", y = "")
+
+}
+```
+
+### plotting functions
+```{r}
+plot_sca = function(data, combined = TRUE, labels = c("A", "B"),
+                    title = FALSE, limits = NULL,
+                    point_size = .1, point_alpha = 1,
+                    ci = TRUE, ci_alpha = .5, ci_size = .1,
+                    line = FALSE, line_size = 1,
+                    median_alpha = 1, median_size = 1,
+                    text_size = 14, title_size = 6,
+                    color_vars = NULL, palette = palette, legend = TRUE,
+                    choices  = c("x", "content", "medium", "sharing", "controls"),
+                    alpha_values = c(0.5, 1),
+                    remove_y = FALSE, remove_facet = FALSE,
+                    collapse_content = FALSE) {
+  
+  medians = data %>%
+    group_by(get(color_vars)) %>%
+    summarize(median = median(estimate)) %>%
+    ungroup() %>%
+    mutate(color = sprintf("%s", palette))
+  
+  if (combined == TRUE) {
+      p1 = specr::plot_curve(data, point_size = point_size, point_alpha = point_alpha,
+                      ci = ci, ci_alpha = ci_alpha, ci_size = ci_size,
+                      line = line, line_size = line_size,
+                      limits = limits) +
+        geom_hline(data = medians, aes(yintercept = median, color = color, linetype = `get(color_vars)`),
+                   alpha = median_alpha, size = median_size, show_guide = TRUE) +
+        scale_linetype_manual(name = "", values = rep(1, nrow(medians)), 
+                              guide = guide_legend(override.aes = list(color = palette))) +
+        labs(x = "", y = "standarized\nregression coefficient\n")  +
+        theme(legend.position = "top",
+              text = element_text(size = text_size, family = "Futura Medium"))
+      
+      if (legend == FALSE) {
+        p1 = p1 +
+          theme(legend.position = "none")
+      }
+      
+      if (title == TRUE) {
+        if (is.null(limits)) {
+          title_range = max(data$conf.high) - min(data$conf.high)
+          title_y = max(data$conf.high) - (title_range / 10)
+        } else {
+          title_range = limits[2] - limits[1]
+          title_y = limits[2] - (title_range / 10)
+        }
+        p1 = p1 + annotate("text", -Inf, Inf, label = unique(data$x), fontface = 2, size = title_size,
+                       x = 0.5*(1 + nrow(data)), 
+                       y = title_y)
+      }
+      
+      if (!is.null(color_vars)) {
+        p2 = plot_choices(data, choices = choices,
+                          alpha_values = alpha_values, color_vars = color_vars,
+                          palette = palette, collapse_content = collapse_content) +
+          labs(x = "\nspecifications (ranked)")  +
+          theme(strip.text.x = element_blank(),
+                text = element_text(size = text_size, family = "Futura Medium"))
+      } else {
+        p2 = plot_choices(data, choices = choices,
+                          alpha_values = alpha_values, collapse_content = collapse_content) +
+          labs(x = "\nspecifications (ranked)")  +
+          theme(strip.text.x = element_blank(),
+                text = element_text(size = text_size, family = "Futura Medium"))
+      }
+        
+  } else {
+      p1 = specr::plot_curve(data, point_size = point_size, point_alpha = point_alpha,
+                      ci_alpha = ci_alpha, ci_size = ci_size) +
+        geom_hline(yintercept = 0, linetype = "solid", color = "black", size = .5) +
+        labs(x = "", y = "standarized\nregression coefficient\n") +
+        theme(text = element_text(size = text_size, family = "Futura Medium"))
+      
+      if (title == TRUE) {
+        if (is.null(limits)) {
+          title_range = max(data$conf.high) - min(data$conf.high)
+          title_y = max(data$conf.high) - (title_range / 10)
+        } else {
+          title_range = limits[2] - limits[1]
+          title_y = limits[2] - (title_range / 10)
+        }
+        p1 = p1 + annotate("text", -Inf, Inf, label = unique(data$y), fontface = 2, size = title_size,
+                       x = 0.5*(1 + nrow(data)), 
+                       y = title_y)
+      }
+      
+      p2 = plot_choices(data, choices = choices,
+                               alpha_values = alpha_values, collapse_content = collapse_content) +
+        labs(x = "\nspecification number (ranked)") +
+        theme(strip.text.x = element_blank(),
+              text = element_text(size = text_size, family = "Futura Medium"))
+  }
+  
+  if (remove_y == TRUE) {
+    p1 = p1 + labs(y = "")
+    
+    p2 = p2 + theme(axis.text.y = element_blank(),
+                    axis.ticks.y = element_blank()) +
+      labs(y = "")
+  }
+
+  if (remove_facet == TRUE) {
+    p2 = p2 + theme(strip.text.y = element_blank())
+  }
+  
+  specr::plot_specs(plot_a = p1,
+             plot_b = p2,
+             labels = labels,
+             rel_height = c(.35, .65))
+}
+
+plot_sca_compare = function(data, pointrange = TRUE, labels = c("A", "B"), 
+                            rel_heights = c(.75, .25), rel_widths = c(.75, .25), 
+                            title = FALSE, text_size = 14, title_size = 6, n_rows = 1, angle_text = FALSE,
+                            remove_x = FALSE, remove_y = FALSE, sig = NULL) {
+  
+  # source raincloud plot
+  source("https://gist.githubusercontent.com/benmarwick/2a1bb0133ff568cbe28d/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
+  
+  # merge and tidy for plotting
+  plot_data = data %>%
+    group_by(x) %>%
+    arrange(estimate) %>%
+    mutate(specification = row_number()) %>%
+    ungroup() %>%
+    unique()
+  
+  # labels
+  median_cl_boot = function(x, conf = 0.95, df = TRUE, ci = "low") {
+  
+    lconf = (1 - conf)/2
+    uconf = 1 - lconf
+    require(boot)
+    bmedian = function(x, ind) median(x[ind])
+    bt = boot(x, bmedian, 1000)
+    bb = boot.ci(bt, type = "perc")
+    
+    if (df == TRUE){
+      data.frame(y = median(x),
+                 ymin = quantile(bt$t, lconf), 
+                 ymax = quantile(bt$t, uconf))
+      
+    } else {
+      if (ci == "low") {
+        quantile(bt$t, lconf)
+      } else {
+        quantile(bt$t, uconf)
+      }
+    }
+  }
+  
+  labs = plot_data %>%
+    group_by(x) %>%
+    summarize(med = median(estimate),
+              low = median_cl_boot(estimate, df = FALSE, ci = "low"),
+              high = median_cl_boot(estimate, df = FALSE, ci = "high")) %>%
+    mutate(range = max(high) - min(low),
+           estimate = ifelse(med > 0, high + (range / 10), low - (range / 10)),
+           label = ifelse(x %in% sig, "*", ""))
+  
+  # plot curves
+  if (pointrange == TRUE) {
+    a = plot_data %>%
+    ggplot(aes(specification, estimate, color = x)) +
+      geom_linerange(aes(ymin = conf.low, ymax = conf.high), size = .1) +
+      geom_point() +
+      geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 1) +
+      scale_color_manual(name = "", values = palette_relevance) +
+      scale_y_continuous(breaks = scales::pretty_breaks(n = 4)) + 
+      labs(x = "\nspecification number (ranked)", y = "standarized\negression coefficient\n") + 
+      theme_minimal() + 
+      theme(strip.text = element_blank(), 
+            axis.line = element_line("black", size = 0.5), 
+            legend.position = c(.5, .1), 
+            legend.direction = "horizontal",
+            panel.spacing = unit(0.75, "lines"), 
+            axis.text = element_text(colour = "black"),
+            text = element_text(size = text_size, family = "Futura Medium"))
+    if (title == TRUE) {
+      a = a + annotate("text", -Inf, Inf, label = unique(plot.data$y), fontface = 2, size = title_size,
+                       x = 0.5*(min(plot.data$specification) + max(plot.data$specification)), 
+                       y = max(plot.data$conf.high))
+    }
+    
+  } else {
+    a = plot_data %>%
+      ggplot(aes(specification, estimate, color = x)) +
+      geom_point() +
+      geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 1) +
+      scale_color_manual(name = "", values = palette_relevance) +
+      scale_y_continuous(breaks = scales::pretty_breaks(n = 4)) + 
+      labs(x = "\nspecification number (ranked)", y = "standarized\nregression coefficient\n") + 
+      theme_minimal() + 
+      theme(strip.text = element_blank(), 
+            axis.line = element_line("black", size = 0.5), 
+            legend.position = "none", 
+            legend.direction = "horizontal",
+            panel.spacing = unit(0.75, "lines"), 
+            axis.text = element_text(colour = "black"),
+            text = element_text(size = text_size, family = "Futura Medium"))
+    if (title == TRUE) {
+      a = a + annotate("text", -Inf, Inf, label = unique(plot.data$y), fontface = 2, size = title_size,
+                       x = 0.5*(min(plot.data$specification) + max(plot.data$specification)), 
+                       y = max(plot.data$estimate))    
+      }
+  }
+  
+    b = plot_data %>%
+      group_by(x) %>%
+      mutate(order = median(estimate)) %>%
+      ggplot(aes(reorder(x, order), estimate, fill = x)) +
+      geom_flat_violin(position = position_nudge(x = .1, y = 0), color = FALSE) +
+      geom_point(aes(color = x), position = position_jitter(width = .05), size = .1, alpha = .1) + 
+      geom_boxplot(width = .1, outlier.shape = NA, fill = NA) +
+      geom_text(data = labs, aes(label = label, x = x, y = estimate), size = 6) +
+      scale_fill_manual(name = "", values = palette_relevance) +
+      scale_color_manual(name = "", values = palette_relevance) +
+      scale_y_continuous(breaks = scales::pretty_breaks(n = 4)) + 
+      labs(x = "\n", y = "standarized\nregression coefficient\n") + 
+      theme_minimal() + 
+      theme(strip.text = element_blank(), 
+            axis.line = element_line("black", size = 0.5), 
+            legend.position = "none", 
+            panel.spacing = unit(0.75, "lines"), 
+            axis.text = element_text(colour = "black"),
+            text = element_text(size = text_size, family = "Futura Medium"))
+    
+    if (angle_text == TRUE) {
+      b = b + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    }
+    
+  if (n_rows == 1) {
+    a = a + theme(legend.position = c(.5, .1))
+    b = b + coord_flip() +
+      labs(x = "\n", y = "\nmedian") + 
+      theme(axis.text.x = element_text(angle = 0, hjust = 1),
+            axis.text.y = element_blank())
+  }     
+    
+
+  if (remove_x == TRUE) {
+    a = a + labs(x = "")
+    
+    if (n_rows == 1) {
+      b = b + labs(y = "")
+    } else {
+      b = b + labs(x = "")
+    }
+  }    
+  
+  if (remove_y == TRUE) {
+    a = a + labs(y = "")
+    
+    if (n_rows == 1) {
+      b = b + labs(x = "")
+    } else {
+      b = b + labs(y = "")
+    }
+  }  
+    
+  cowplot::plot_grid(a, b, labels = labels, rel_heights = rel_heights, rel_widths = rel_widths, nrow = n_rows)
+}
+```
+
+## main manuscript plot
+This plot is reported in Figure 3.
+```{r, fig.width=14, fig.height=16}
+ggarrange(self_between, social_between, self_within, social_within, 
+          ncol = 2, nrow = 2, labels = c("A", "B", "C", "D"), widths = c(.51, .49, .51, .49))
+```
+
+## supplementary material plots {.tabset}
+### combined
+This plot is reported in Figure S5.
+
+```{r, fig.width=12, fig.height=14}
+plot_sca(data = output1, combined = TRUE, title = FALSE, text_size = 20, median_size = 1.25,
+         color_vars = "x", palette = palette_relevance, alpha_values = c(.2, .5),
+         choices = c("relevance", "content", "medium", "sharing", "controls"),
+         collapse_content = TRUE)
+```
+
+### include subsets {.tabset}
+#### between-person relevance
+This plot is reported in Figure S3.
+
+```{r, fig.width=14, fig.height=14}
+self_between_subset = plot_sca(data = filter(output1, grepl("self between", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
+         color_vars = "medium", palette = palette[3:4],
+         remove_facet = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-.3, 1),
+         collapse_content = TRUE)
+
+social_between_subset= plot_sca(data = filter(output1, grepl("social between", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(.5, 1), text_size = 18,
+         color_vars = "medium", palette = palette[3:4],
+         remove_y = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-.3, 1),
+         collapse_content = TRUE)
+
+ggarrange(self_between_subset, social_between_subset, ncol = 2, labels = c("A", "B"), widths = c(.51, .49))
+```
+
+#### within-person relevance
+This plot is reported in Figure S4.
+
+```{r, fig.width=14, fig.height=14}
+self_within_subset = plot_sca(data = filter(output1, grepl("self within", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
+         color_vars = "sharing", palette = palette_sharing,
+         remove_facet = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-0, .4),
+         collapse_content = TRUE)
+
+social_within_subset = plot_sca(data = filter(output1, grepl("social within", x)), combined = TRUE, title = TRUE,
+         ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
+         color_vars = "sharing", palette = palette_sharing,
+         remove_y = TRUE, labels = c("", ""), median_size = 1,
+         choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-0, .4),
+         collapse_content = TRUE)
+
+ggarrange(self_within_subset, social_within_subset, ncol = 2, labels = c("A", "B"), widths = c(.51, .49))
+```
+
+## curve comparison
+This plot is reported in Figure 2.
+
+```{r, fig.width=6, fig.height=6}
+plot_sca_compare(data = output1, pointrange = FALSE, n_rows = 2, rel_heights = c(.5, .5))
+```
+
+# tables {.tabset}
+Descriptive stats for the curve of each relevance variable.
+
+## combined
+This table is reported in Table 4.
+
+```{r}
+n_models = output1 %>%
+  filter(relevance == "self within")
+
+output1 %>%
+  mutate(positive = ifelse(estimate > 0, 1, 0),
+         negative = ifelse(estimate < 0, 1, 0),
+         sig = case_when(conf.low > 0 ~ 1,
+                             conf.high < 0 ~ 1,
+                             TRUE ~ 0),
+         positive_significant = ifelse(positive == 1 & sig == 1, 1, 0),
+         negative_significant = ifelse(negative == 1 & sig == 1, 1, 0)) %>%
+  group_by(relevance) %>%
+  summarize(min = min(estimate),
+            max = max(estimate),
+            median = median(estimate),
+            positive = (sum(positive) / nrow(n_models)) * 100,
+            negative = (sum(negative) / nrow(n_models)) * 100,
+            positive_significant = (sum(positive_significant) / nrow(n_models)) * 100,
+            negative_significant = (sum(negative_significant) / nrow(n_models)) * 100) %>%
+  mutate(range = sprintf("%.2f, %.2f", min, max)) %>%
+  select(relevance, median, range, positive, negative, positive_significant, negative_significant) %>%
+  knitr::kable(digits = 2)
+```
+
+## by sharing type
+This table is reported in Table S4.
+
+```{r}
+n_broadcast = output1 %>%
+  filter(sharing == "broadcast") %>%
+  filter(relevance == "self between")
+
+n_narrowcast = output1 %>%
+  filter(sharing == "narrowcast") %>%
+  filter(relevance == "self between")
+
+output1 %>%
+  mutate(positive = ifelse(estimate > 0, 1, 0),
+         negative = ifelse(estimate < 0, 1, 0),
+         sig = case_when(conf.low > 0 ~ 1,
+                             conf.high < 0 ~ 1,
+                             TRUE ~ 0),
+         positive_significant = ifelse(positive == 1 & sig == 1, 1, 0),
+         negative_significant = ifelse(negative == 1 & sig == 1, 1, 0)) %>%
+  group_by(relevance, sharing) %>%
+  summarize(min = min(estimate),
+            max = max(estimate),
+            median = median(estimate),
+            positive = sum(positive),
+            negative = sum(negative),
+            positive_significant = sum(positive_significant),
+            negative_significant = sum(negative_significant)) %>%
+  gather(item, value, contains("positive"), contains("negative")) %>%
+  mutate(value = ifelse(sharing == "broadcast", (value / nrow(n_broadcast)) * 100, (value / nrow(n_narrowcast)) * 100),
+         range = sprintf("%.2f, %.2f", min, max)) %>%
+  spread(item, value) %>%
+  select(sharing, relevance, median, range, positive, negative, positive_significant, negative_significant) %>%
+  knitr::kable(digits = 2)
+```
+
+## by message medium
+This table is reported in Table S4.
+
+```{r}
+n_social = output1 %>%
+  filter(medium == "social media") %>%
+  filter(relevance == "self between")
+
+n_newspaper = output1 %>%
+  filter(medium == "newspaper") %>%
+  filter(relevance == "self between")
+
+output1 %>%
+  mutate(positive = ifelse(estimate > 0, 1, 0),
+         negative = ifelse(estimate < 0, 1, 0),
+         sig = case_when(conf.low > 0 ~ 1,
+                             conf.high < 0 ~ 1,
+                             TRUE ~ 0),
+         positive_significant = ifelse(positive == 1 & sig == 1, 1, 0),
+         negative_significant = ifelse(negative == 1 & sig == 1, 1, 0)) %>%
+  group_by(relevance, medium) %>%
+  summarize(min = min(estimate),
+            max = max(estimate),
+            median = median(estimate),
+            positive = sum(positive),
+            negative = sum(negative),
+            positive_significant = sum(positive_significant),
+            negative_significant = sum(negative_significant)) %>%
+  gather(item, value, contains("positive"), contains("negative")) %>%
+  mutate(value = ifelse(medium == "social media", (value / nrow(n_social)) * 100, (value / nrow(n_newspaper)) * 100),
+         range = sprintf("%.2f, %.2f", min, max)) %>%
+  spread(item, value) %>%
+  select(medium, relevance, median, range, positive, negative, positive_significant, negative_significant) %>%
+  knitr::kable(digits = 2)
+```
+

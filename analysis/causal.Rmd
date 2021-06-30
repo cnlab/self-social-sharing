@@ -1,0 +1,305 @@
+---
+title: "Causal analyses"
+author: "[The Communication Neuroscience Lab at Penn](https://cn.asc.upenn.edu/)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, dpi = 150)
+options(scipen = 999)
+set.seed(65)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+In these analyses, we test causal relationships between self and social relevance and broad- and narrowcast sharing intentions with data from Study 6.
+
+# define functions
+```{r}
+# MLM results table function
+table_model = function(model_data) {
+  model_data %>%
+  broom.mixed::tidy(conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  rename("SE" = std.error,
+         "t" = statistic,
+         "p" = p.value) %>%
+  select(-group, -effect) %>%
+  mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
+  mutate(term = gsub("article_cond", "", term),
+         term = gsub("\\(Intercept\\)", "control", term),
+         term = gsub("sharing_type", "sharing type", term),
+         term = gsub("msg_rel_self_between", "self-relevance", term),
+         term = gsub("msg_rel_social_between", "social relevance", term),
+         term = gsub(":", " x ", term),
+         p = ifelse(p < .001, "< .001",
+                    ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
+         `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
+  select(term, `b [95% CI]`, df, t, p) %>%
+  kable()  %>%
+  kable_styling()
+}
+```
+
+# prep data {.tabset}
+First, we load the relevant packages and data, and define the plotting aesthetics.
+
+## load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(knitr)) {
+  install.packages('knitr')
+}
+if (!require(kableExtra)) {
+  install.packages('kableExtra')
+}
+if (!require(lmerTest)) {
+  install.packages('lmerTest')
+}
+if (!require(boot)) {
+  install.packages('boot')
+}
+```
+
+## define aesthetics
+```{r}
+palette_condition = c("#ffb800", "#E64626", "#1985A1")
+palette_sharing = c("#4c5c68", "#B8B3BE")
+
+plot_aes = theme_minimal() +
+  theme(legend.position = "top",
+        legend.text = element_text(size = 12),
+        text = element_text(size = 16, family = "Futura Medium"),
+        axis.text = element_text(color = "black"),
+        axis.line = element_line(colour = "black"),
+        axis.ticks.y = element_blank())
+```
+
+## load data
+```{r}
+study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE) %>%
+  mutate(sharing_type = ifelse(sharing_type == 0, -.5, .5))
+```
+
+# manipulation checks {.tabset}
+## self-relevance {.tabset}
+Test whether messages in the self condition will be rated as more self-relevant than messages in the control condition.
+
+### run model
+```{r}
+mod_h1 = lmer(msg_rel_self ~ 1 + article_cond + (1 + article_cond | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+summary(mod_h1)
+```
+
+### model summary table
+```{r}
+table_model(mod_h1)
+```
+
+## social relevance {.tabset}
+Test whether messages in the social condition will be rated as more socially relevant than messages in the control condition.
+
+### run model
+```{r}
+mod_h2 = lmer(msg_rel_social ~ 1 + article_cond + (1 + article_cond | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+summary(mod_h2)
+```
+
+### model summary table
+```{r}
+table_model(mod_h2)
+```
+
+# condition effects by sharing type {.tabset}
+Test whether messages in the experimental conditions will evoke higher sharing intentions than messages in the control condition, and whether this is moderated by sharing type.
+
+## run model
+```{r}
+mod_h3_h4 = lmer(msg_share ~ 1 + article_cond*sharing_type + (1 + sharing_type | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+summary(mod_h3_h4)
+```
+
+## model summary table
+```{r}
+table_model(mod_h3_h4)
+```
+
+# combined plot
+This is the plot in Figure 4.
+
+```{r, fig.width=12, fig.height=5}
+# generate predicted values
+predicted_h1 = ggeffects::ggpredict(mod_h1, c("article_cond")) %>%
+              data.frame() %>%
+  mutate(model = "self\nrelevance")
+
+predicted_h2 = ggeffects::ggpredict(mod_h2, c("article_cond")) %>%
+              data.frame() %>%
+  mutate(model = "social\nrelevance")
+
+predicted_h3_h4 = ggeffects::ggpredict(mod_h3_h4, c("article_cond", "sharing_type")) %>%
+              data.frame() %>%
+  mutate(group = ifelse(group == "-0.5", "broadcast sharing", "narrowcast sharing"))
+
+# manipulation check plot
+check = bind_rows(predicted_h1, predicted_h2) %>%
+  ggplot(aes(x = model, y = predicted, color = x)) +
+    geom_pointrange(aes( ymin = conf.low, ymax = conf.high), position = position_dodge(.5), size = 1) +
+    coord_flip() +
+    scale_fill_manual(name = "", values = palette_condition) +
+    scale_color_manual(name = "", values = palette_condition) +
+    scale_y_continuous(limits = c(50, 72)) +
+    labs(x = "", y = "\nmean predicted rating") +
+    plot_aes +
+    theme(legend.position = c(.85, .2))
+
+# causal analysis plot
+causal = predicted_h3_h4 %>%
+  mutate(group = gsub(" sharing", "", group)) %>%
+  ggplot(aes(x = x, y = predicted, color = group)) +
+  geom_pointrange(aes( ymin = conf.low, ymax = conf.high), position = position_dodge(.5), size = 1) +
+  coord_flip() +
+  scale_fill_manual(name = "", values = palette_sharing) +
+  scale_color_manual(name = "", values = palette_sharing) +
+  labs(x = "", y = "\nmean predicted sharing intention rating") +
+  scale_y_continuous(limits = c(40, 60)) +
+  plot_aes +
+  theme(legend.position = c(.85, .2))
+
+cowplot::plot_grid(check, causal, labels = c("A", "B"))
+```
+
+# mediation {.tabset}
+Use [Elizabeth Page-Gould's code for estimating indirect effects in multilevel models](http://www.page-gould.com/r/indirectmlm/) to test whether the experimental effects on sharing intentions are mediate through self or social relevance.
+
+## prep data
+```{r}
+# source functions
+source("indirectMLM.R")
+
+# create self condition dataframe
+data_med_self = study6 %>%
+  filter(!article_cond == "social") %>%
+  mutate(article_cond = ifelse(article_cond == "self", 1, 0),
+         sharing_type = ifelse(sharing_type == -.5, "broadcast", "narrowcast"),
+         SID = as.character(SID)) %>%
+  spread(sharing_type, msg_share) %>%
+  select(SID, article_cond, trial, msg_rel_self, broadcast, narrowcast) %>%
+  na.omit() %>%
+  data.frame()
+
+# create social condition dataframe
+data_med_social = study6 %>%
+  filter(!article_cond == "self") %>%
+  mutate(article_cond = ifelse(article_cond == "social", 1, 0),
+         sharing_type = ifelse(sharing_type == -.5, "broadcast", "narrowcast"),
+         SID = as.character(SID)) %>%
+  spread(sharing_type, msg_share) %>%
+  select(SID, article_cond, trial, msg_rel_social, broadcast, narrowcast) %>%
+  na.omit() %>%
+  data.frame()
+```
+
+## self condition {.tabset}
+Test whether there is an indirect effect through self-relevance, such that the self-relevance manipulation will be associated with higher self-relevance ratings, which in turn will be related to stronger a) broadcast and b) narrowcast sharing intentions.
+
+### broadcast intentions
+```{r}
+y_var = "broadcast"
+m_var = "msg_rel_self"
+model_name = "mediation_self_broadcast"
+data = data_med_self
+
+if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
+  assign(get("model_name"), readRDS(sprintf("models/model_%s.RDS", model_name)))
+} else {
+  assign(get("model_name"), boot(data = data, statistic = indirect.mlm, R = 500,
+                                 y = y_var, x = "article_cond", mediator = m_var, group.id = "SID",
+                                 between.m = F, uncentered.x = F))
+  saveRDS(eval(parse(text = model_name)), sprintf("models/model_%s.RDS", model_name))
+}
+
+indirect.mlm.summary(get(model_name))
+```
+
+### narrowcast intentions
+```{r}
+y_var = "narrowcast"
+m_var = "msg_rel_self"
+model_name = "mediation_selfnarrowcast"
+data = data_med_self
+
+if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
+  assign(get("model_name"), readRDS(sprintf("models/model_%s.RDS", model_name)))
+} else {
+  assign(get("model_name"), boot(data = data, statistic = indirect.mlm, R = 500,
+                                 y = y_var, x = "article_cond", mediator = m_var, group.id = "SID",
+                                 between.m = F, uncentered.x = F))
+  saveRDS(eval(parse(text = model_name)), sprintf("models/model_%s.RDS", model_name))
+}
+
+indirect.mlm.summary(get(model_name))
+```
+
+## social condition {.tabset}
+
+Test whether there is an indirect effect through social relevance, such that the social relevance manipulation will be associated with higher social relevance ratings, which in turn will be related to stronger a) broadcast and b) narrowcast sharing intentions.
+
+### broadcast intentions
+```{r}
+y_var = "broadcast"
+m_var = "msg_rel_social"
+model_name = "mediation_social_broadcast"
+data = data_med_social
+
+if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
+  assign(get("model_name"), readRDS(sprintf("models/model_%s.RDS", model_name)))
+} else {
+  assign(get("model_name"), boot(data = data, statistic = indirect.mlm, R = 500,
+                                 y = y_var, x = "article_cond", mediator = m_var, group.id = "SID",
+                                 between.m = F, uncentered.x = F))
+  saveRDS(eval(parse(text = model_name)), sprintf("models/model_%s.RDS", model_name))
+}
+
+indirect.mlm.summary(get(model_name))
+```
+
+### narrowcast intentions
+```{r}
+y_var = "narrowcast"
+m_var = "msg_rel_social"
+model_name = "mediation_social_narrowcast"
+data = data_med_social
+
+if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
+  assign(get("model_name"), readRDS(sprintf("models/model_%s.RDS", model_name)))
+} else {
+  assign(get("model_name"), boot(data = data, statistic = indirect.mlm, R = 500,
+                                 y = y_var, x = "article_cond", mediator = m_var, group.id = "SID",
+                                 between.m = F, uncentered.x = F))
+  saveRDS(eval(parse(text = model_name)), sprintf("models/model_%s.RDS", model_name))
+}
+
+indirect.mlm.summary(get(model_name))
+```

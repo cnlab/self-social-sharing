@@ -1,0 +1,133 @@
+---
+title: "Study 4 data cleaning"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script cleans the raw data from Study 4.
+
+# load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(readr)) {
+  install.packages('readr')
+}
+if (!require(stringr)) {
+  install.packages('stringr')
+}
+if (!require(reshape2)) {
+  install.packages('reshape2')
+}
+```
+
+# load qualtrics data
+
+```{r}
+surveys_raw = read.csv("../../nyt_emotion_study/nytimes+--+emotion+piloting_March+30,+2021_10.47.csv",
+                       stringsAsFactors = FALSE)
+```
+
+# rename and select relevant variables
+```{r}
+surveys_rename = surveys_raw %>%
+  rename("age" = Q8.1,
+         "gender" = Q8.2,
+         "lang" = Q8.3,
+         "check1" = Q7.2,
+         "check2" = Q7.3,
+         "check3" = Q7.4,) %>%
+  select(Progress, ResponseId, age, gender, lang, contains("check"),
+         contains("Q3.5"), contains("Q4.5"),
+         contains("Q5.1"), contains("Q6.1")) %>%
+  slice(-c(1:2)) %>%
+  filter(!as.numeric(Progress) < 98)
+```
+
+# failed English comprehension checks
+```{r}
+failed_check1 = surveys_rename %>%
+  filter(!grepl("tim", tolower(check1)))
+
+failed_check2 = surveys_rename %>%
+  filter(!grepl("man", tolower(check2)))
+
+failed_check3 = surveys_rename %>%
+  filter(!grepl("tim", tolower(check3)))
+
+exclude_english = surveys_rename %>%
+  filter(as.numeric(Progress) >= 98) %>%
+  filter(ResponseId %in% c(failed_check1$ResponseId,
+                            failed_check3$ResponseId,
+                            failed_check3$ResponseId,
+                            "R_O8dIOfbNbLDeDPb",
+                            "R_2D6qZGOLqFv1CoU",
+                            "R_O8dIOfbNbLDeDPb",
+                            "R_3fdghxUoBSEnu9M",
+                            "R_2OYGv6Ctfmx6sB5",
+                            "R_wSLwbv5K9a4TOxj",
+                            "R_1jvLVYzrQNxBhHU",
+                            "R_1rfihdoAdlWS02X"))
+
+```
+
+# exclude participants
+Number of participants before exclusions = `r nrow(surveys_rename)`
+
+Number of participants after exclusions = `r nrow(surveys_rename %>% filter(!ResponseId %in% c(exclude_english$ResponseId)))`
+
+Number excluded = `r nrow(exclude_english)`
+
+Participants are excluded for:
+
+* Failing at least one of the English comprehension questions (N = `r nrow(exclude_english)`)
+
+```{r}
+surveys_include = surveys_rename %>%
+  filter(!ResponseId %in% c(exclude_english$ResponseId))
+```
+
+# tidy
+```{r}
+surveys_tidy = surveys_include %>%
+  gather(item, value, contains("Q3.5"), contains("Q4.5"),
+         contains("Q5.1"), contains("Q6.1")) %>%
+  filter(!value == "") %>%
+  mutate(gender = ifelse(grepl("^f|woman", tolower(gender)), "Female", "Male"),
+         item = gsub("Q3.5_|Q4.5_|Q5.1_|Q6.1_", "", item),
+         item = gsub("_8", "_msg_rel_self", item),
+         item = gsub("_9", "_msg_rel_social", item),
+         item = gsub("_11", "_msg_share", item)) %>%
+  filter(grepl("msg", item)) %>%
+  extract(item, c("item", "scale_name"), "X([0-9]+)_(.*)") %>%
+  select(-contains("check"), -Progress, -lang)
+```
+
+# write csvs
+```{r}
+write.csv(surveys_tidy, "../data/study4_clean_long.csv", row.names = FALSE)
+```

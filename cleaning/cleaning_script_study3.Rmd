@@ -1,0 +1,153 @@
+---
+title: "Study 3 data cleaning"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script cleans the raw data from Study 3.
+
+# load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(knitr)) {
+  install.packages('knitr')
+}
+if (!require(DT)) {
+  install.packages('DT')
+}
+if (!require(devtools)) {
+  install.packages('devtools')
+}
+if (!require(scorequaltrics)) {
+  devtools::install_github('dcosme/qualtrics', ref = "dev/enhance")
+}
+```
+
+# load and tidy data {.tabset}
+## define variables and paths
+
+To pull data from Qualtrics directly, you need a credentials file with an API token associated with your account. To create the file, follow these steps.
+
+1. Generate an API token for Qualtrics. Follow the steps outlined [here](https://www.qualtrics.com/support/integrations/api-integration/overview/).
+
+2. Save a Qualtrics credentials text file with the following format. In this example, the file is being saved as `~/credentials.yaml.PENN`. The `baseurl` is the URL for your institution on Qualtrics. Use `upenn.co1.qualtrics.com` for Penn Qualtrics.
+
+```
+token: oILNW6...[your qualtrics API token]
+baseurl: upenn.co1.qualtrics.com
+```
+
+`cred_file_location` = path to your Qualtrics credential file. 
+
+`survey_name_filter` = regular expression to filter the available stuveys
+
+```{r}
+cred_file_location = '~/credentials.yaml.PENN'
+survey_filter = 'PLTV.*SONA'
+```
+
+## filter matching surveys
+```{r}
+# load credential file
+credentials = scorequaltrics::creds_from_file(cred_file_location)
+
+# filter
+surveysAvail = scorequaltrics::get_surveys()
+surveysFiltered = filter(surveysAvail, grepl(survey_filter, name))
+knitr::kable(arrange(select(surveysFiltered, name), name))
+```
+
+## load data
+* The survey key is located [here]()
+* The message stimuli can be found [here]())
+
+```{r}
+survey_raw = scorequaltrics::get_survey_responses(surveysFiltered$id[1])
+```
+
+## tidy data
+This code tidies the raw data and outputs a dataframe in the long format with the following columns:
+
+`study` = study name  
+`condition` = experimental group (no message control, message control, norm, autonomous, mocking)  
+`survey_name` = name of the survey or question category (e.g. intentions or SES)  
+`item` = individual survey item (or message rating) name  
+`value` = response or rating  
+
+```{r}
+# load and tidy survey
+surveys = survey_raw %>%
+  filter(!DistributionChannel == "preview") %>% # remove preview responses
+  filter(is.na(eligible)) %>% # remove participants who were ineligible
+  filter(Progress >= 98) %>% # remove incomplete responses
+  mutate(SID = sprintf("s%03d", row_number())) %>% # create unique SID
+  gather(item, value, -c(SID, group)) %>%
+  mutate(value = ifelse(value == "", NA, value), #recode blank values as NA
+         item = gsub("message_ratings_e_|message_ratings_c_", "msg_", item),
+         item = gsub("msg_1", "msg_rel_self", item),
+         item = gsub("msg_2", "msg_rel_social", item),
+         item = gsub("msg_3", "msg_motivation_self", item),
+         item = gsub("msg_4", "msg_motivation_social", item),
+         item = gsub("msg_5", "msg_sharing_broad", item),
+         item = gsub("msg_6", "msg_sharing_narrow", item),
+         item = gsub("msg_7", "msg_check_norms", item),
+         item = gsub("msg_8", "msg_check_identity", item),
+         item = gsub("([1-5])_(msg_.*)", "\\2_\\1", item)) %>%
+  filter(!(is.na(value) & grepl("msg_", item))) %>% #remove items from the other experimental condition
+  extract(item, "survey_name", "(.*)_[0-9]+", remove = FALSE) %>%
+  mutate(survey_name = ifelse(is.na(survey_name), item, survey_name),
+         survey_name = gsub("[0-9]+_", "", survey_name)) %>%
+  filter(!grepl("_DO_", item)) # remove randomization order info
+
+# spread to wide format
+surveys_wide = surveys %>%
+  select(-survey_name) %>%
+  spread(item, value)
+```
+
+# summarize survey ns
+```{r}
+surveys %>%
+  select(SID) %>%
+  unique() %>%
+  summarize(n = n())
+
+surveys %>%
+  filter(!is.na(value)) %>%
+  group_by(survey_name) %>%
+  select(SID, survey_name) %>%
+  unique() %>%
+  summarize(n = n()) %>%
+  DT::datatable(filter = "top", rownames = FALSE)
+```
+
+# write csvs
+```{r}
+write.csv(surveys, "../data/study3_clean_long.csv", row.names = FALSE)
+write.csv(surveys_wide, "../data/study3_clean_wide.csv", row.names = FALSE)
+```

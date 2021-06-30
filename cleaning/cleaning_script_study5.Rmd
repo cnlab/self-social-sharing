@@ -1,0 +1,251 @@
+---
+title: "Study 5 data cleaning"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script cleans the raw data from Study 5.
+
+# load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(knitr)) {
+  install.packages('knitr')
+}
+if (!require(DT)) {
+  install.packages('DT')
+}
+if (!require(devtools)) {
+  install.packages('devtools')
+}
+
+if (!require(scorequaltrics)) {
+  devtools::install_github('dcosme/qualtrics', ref = "dev/enhance")
+}
+```
+
+# load and tidy data {.tabset}
+## define variables and paths
+
+To pull data from Qualtrics directly, you need a credentials file with an API token associated with your account. To create the file, follow these steps.
+
+1. Generate an API token for Qualtrics. Follow the steps outlined [here](https://www.qualtrics.com/support/integrations/api-integration/overview/).
+
+2. Save a Qualtrics credentials text file with the following format. In this example, the file is being saved as `~/credentials.yaml.PENN`. The `baseurl` is the URL for your institution on Qualtrics. Use `upenn.co1.qualtrics.com` for Penn Qualtrics.
+
+```
+token: oILNW6...[your qualtrics API token]
+baseurl: upenn.co1.qualtrics.com
+```
+
+`cred_file_location` = path to your Qualtrics credential file. 
+
+`survey_name_filter` = regular expression to filter the available stuveys
+
+```{r}
+cred_file_location = '~/credentials.yaml.PENN'
+survey_filter = 'BB-PRIME_PENN_Relevance_Sharing_Covid_Environment'
+```
+
+## filter matching surveys
+```{r}
+# load credential file
+credentials = scorequaltrics::creds_from_file(cred_file_location)
+
+# filter
+surveysAvail = scorequaltrics::get_surveys()
+surveysFiltered = filter(surveysAvail, grepl(survey_filter, name))
+knitr::kable(arrange(select(surveysFiltered, name), name))
+```
+
+## load data
+
+```{r}
+survey_raw = scorequaltrics::get_survey_responses(surveysFiltered$id[1])
+```
+
+## tidy data
+This code tidies the raw data and outputs a dataframe in the long format with the following columns:
+
+`study` = study name  
+`condition` = experimental group (no message control, message control, norm, autonomous, mocking)  
+`survey_name` = name of the survey or question category (e.g. intentions or SES)  
+`item` = individual survey item (or message rating) name  
+`value` = response or rating  
+
+```{r}
+# load state codes
+states = read.csv("state_codes.csv", stringsAsFactors = FALSE) %>%
+  mutate(state_code = as.numeric(state_code))
+
+# load and tidy survey
+surveys = survey_raw %>%
+  filter(!DistributionChannel == "preview") %>% # remove preview responses
+  filter(screen_1 == 1 & screen_2 == 1 & screen_3 == 1 & screen_4 == "How do you feel about sharing information online?") %>% # remove participants who failed screener
+  filter(testJS == 1) %>% # remove failed tests
+  filter(!is.na(pre_headline_time)) %>% # got screened out
+  filter(!MID == "") %>% # remove test responses
+  filter(Progress >= 98) %>% # remove incomplete responses
+  rename("state_code" = state) %>%
+  left_join(., states, by = "state_code") %>% # replace state code with name
+  select(-state_code) %>%
+  mutate(SID = sprintf("s%03d", row_number())) %>% # create unique SID
+  gather(item, value, -c(SID)) %>%
+  mutate(value = ifelse(value == "", NA, value), #recode blank values as NA
+         item = gsub("sharing_23", "sharing_broad", item),
+         item = gsub("sharing_30", "sharing_narrow", item),
+         item = gsub("rel_emo_20", "relevance_self", item),
+         item = gsub("rel_emo_21", "relevance_social", item),
+         item = gsub("rel_emo_35", "relevance_society", item),
+         item = gsub("rel_emo_33", "emotion_positive", item),
+         item = gsub("rel_emo_34", "emotion_negative", item),
+         item = gsub("belief_climate_narro", "belief_climate_narrow", item)) %>%
+  extract(item, "survey_name", "(.*)_[0-9]+", remove = FALSE) %>%
+  mutate(survey_name = ifelse(is.na(survey_name), item, survey_name),
+         survey_name = gsub("[0-9]+_", "", survey_name)) %>%
+  filter(!grepl("_DO_", item)) # remove randomization order info
+
+# spread to wide format
+surveys_wide = surveys %>%
+  select(-survey_name) %>%
+  spread(item, value)
+```
+
+# quality checks
+## failed checks
+* The correct answer for the English check is the school bus, but let's be lenient and accept the truck as well
+
+```{r}
+# identify failed attention checks
+failed_attn = surveys %>%
+  filter((item == "1_attention" & !value == 1) | (item == "6_attention" & !value == 1)) %>%
+  select(SID, item, value) %>%
+  mutate(value = 1) %>%
+  spread(item, value) %>%
+  mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
+  mutate(n_failed = `1_attention` + `6_attention`)
+
+removed_attn = failed_attn %>%
+  filter(SID %in% filter(failed_attn, n_failed == 2)$SID) %>%
+  select(SID)
+
+# identify failed knowledge checks
+failed_covid_qs = surveys %>%
+  select(-survey_name) %>%
+  filter(grepl("knowledge|^code", item)) %>%
+  spread(item, value) %>%
+  gather(item, value, starts_with("knowledge")) %>%
+  filter(!SID %in% removed_attn$SID) %>% # ignore participants who were removed for failing both attention checks
+  mutate(failed = ifelse(item == "knowledge_covid" & SID %in% c("s008", "s014", "s020", "s054",
+                                                                "s064", "s065", "s129", "s237",
+                                                                "s241", "s260", "s277", "s282",
+                                                                "s312", "s342", "s355"), 1, 0)) %>%
+  select(SID, item, failed) %>%
+  unique()
+
+failed_covid_subs = failed_covid_qs %>%
+  filter(failed > 0)
+
+# identify failed English checks
+failed_english = surveys %>%
+  filter(!SID %in% removed_attn$SID) %>% # ignore participants who were removed for failing both attention checks
+  filter(item == "english") %>%
+  filter(!grepl("bus|truck|truk", tolower(value)) | SID %in% c("s194", "s235")) %>% #these participants copied the sentence
+  select(SID, value) %>%
+  unique()
+
+# print number of failed checks
+failed = surveys %>% 
+  select(SID) %>% 
+  unique() %>% 
+  mutate(failed_attention = ifelse(SID %in% failed_attn$SID, 1, 0), 
+         failed_english = ifelse(SID %in% failed_english$SID, 1, 0), 
+         failed_covid_qs = ifelse(SID %in% failed_covid_subs$SID, 1, 0),
+         `failed english & attention` = ifelse(failed_attention == 1 & failed_english == 1, 1, 0),
+         `failed english & covid qs` = ifelse(failed_english == 1 & failed_covid_qs == 1, 1, 0),
+         `failed attention & covid qs` = ifelse(failed_attention == 1 & failed_covid_qs == 1, 1, 0),
+         `failed attention & covid & english` = ifelse(failed_attention == 1 & failed_covid_qs == 1 & failed_english == 1, 1, 0),
+         `failed at least one check`  = ifelse(failed_attention == 1 | failed_covid_qs == 1 | failed_english, 1, 0))
+
+failed_subs = failed %>%
+  filter(`failed at least one check` == 1) %>%
+  select(SID, failed_attention, failed_english, failed_covid_qs) %>%
+  mutate(n_failed = failed_attention + failed_english + failed_covid_qs)
+
+failed %>%
+  gather(check, val, contains("fail")) %>% 
+  filter(val == 1) %>% 
+  group_by(check) %>% 
+  summarize(n = n(),
+            `%` = round(n / nrow(failed_covid_qs) * 100, 1)) %>%
+  arrange(desc(n)) %>%
+  kable(format = "pandoc")
+```
+
+# exclude participants
+
+Number of participants before exclusions = `r nrow(surveys_wide)`  
+Number of participants after exclusions = `r nrow(filter(surveys_wide, !SID %in% failed_subs$SID))` 
+Number excluded = `r nrow(failed_subs)`
+
+Participants are excluded for:
+
+* Failing at least one of the attention check (N = `r nrow(filter(failed_subs, n_failed == 1 & failed_attention > 0))`)
+* Failing the English comprehension check (N = `r nrow(filter(failed_subs, n_failed == 1 & failed_english > 0))`)
+* Failing the COVID-19 question (N = `r nrow(filter(failed_subs, n_failed == 1 & failed_covid_qs > 0))`)
+* More than one of these issues (N = `r nrow(filter(failed_subs, n_failed > 1))`)
+
+Number of participants who failed both attention checks and were removed = `r nrow(filter(failed_attn, n_failed == 2))`  
+
+```{r}
+surveys_clean = surveys %>%
+  filter(!SID %in% failed_subs$SID) %>% # exclude participants
+  filter(!item == "MID") %>% #remove MIDs 
+  select(SID, survey_name, item, value)
+```
+
+# summarize survey ns
+```{r}
+surveys_clean %>%
+  select(SID) %>%
+  unique() %>%
+  summarize(n = n())
+
+surveys_clean %>%
+  filter(!is.na(value)) %>%
+  group_by(survey_name) %>%
+  select(SID, survey_name) %>%
+  unique() %>%
+  summarize(n = n()) %>%
+  DT::datatable(filter = "top", rownames = FALSE)
+```
+
+# write csvs
+```{r}
+write.csv(surveys_clean, "../data/study5_clean_long.csv", row.names = FALSE)
+```

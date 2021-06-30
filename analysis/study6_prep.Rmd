@@ -1,0 +1,172 @@
+---
+title: "Study 6 Prep"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script tidies and prepares the cleaned data from Study 6.
+
+# load packages
+```{r}
+if(!require('pacman')) {
+	install.packages('pacman')
+}
+
+pacman::p_load(tidyverse)
+```
+
+# load and tidy message data
+
+Create disaggregated dataset
+
+* Between-person variables are grand mean centered and standardized across people
+* Within-person variables are centered within-person and standardized across people
+
+```{r}
+data_raw = read.csv("../data/study6_clean_long.csv", stringsAsFactors = FALSE)
+
+article_info = read.csv("../../causal_study/original_stim_list.csv", stringsAsFactors = FALSE) %>%
+  select(main_headline, clicks)
+
+articles = read.csv("../../causal_study/articles.csv", stringsAsFactors = FALSE) %>%
+  left_join(., article_info)
+
+stim_order = data_raw %>%
+  filter(grepl("stim_order", survey_name)) %>%
+  select(SID, value) %>%
+  mutate(article_number = strsplit(value, "\\|")) %>%
+  unnest(article_number) %>%
+  mutate(article_number = as.numeric(article_number)) %>%
+  select(-value) %>%
+  bind_cols(., data.frame(item = rep(1:10, length(unique(data_raw$SID))))) %>%
+  mutate(item = as.character(item)) %>%
+  left_join(., select(articles, article_number, content))
+
+cond_order = data_raw %>%
+  filter(grepl("cond_order", survey_name)) %>%
+  select(SID, value) %>%
+  mutate(article_cond = strsplit(value, "\\|")) %>%
+  unnest(article_cond) %>%
+  select(-value) %>%
+  bind_cols(., data.frame(item = rep(1:10, length(unique(data_raw$SID))))) %>%
+  mutate(item = as.character(item),
+         article_cond = gsub("other", "social", article_cond))
+
+messages = data_raw %>%
+  filter(grepl("sharing|relevance_self|relevance_social", survey_name)) %>%
+  extract(item, "item", "([0-9]+)_.*") %>%
+  mutate(value = as.numeric(value),
+         survey_name = gsub("relevance", "rel", survey_name),
+         survey_name = sprintf("msg_%s", survey_name),
+         cond = gsub("other", "social", cond)) %>%
+  left_join(., stim_order) %>%
+  left_join(., cond_order)
+
+between = messages %>%
+  group_by(survey_name, SID) %>%
+  summarize(value_between = mean(value, na.rm = TRUE)) %>%
+  group_by(survey_name) %>%
+  mutate(value_between = scale(value_between, scale = TRUE, center = TRUE),
+         survey_between = sprintf("%s_between", survey_name)) %>%
+  ungroup() %>%
+  select(-survey_name) %>%
+  spread(survey_between, value_between)
+
+within = messages %>%
+  group_by(survey_name, SID) %>%
+  mutate(trial = row_number(),
+         value_within = scale(value, scale = FALSE, center = TRUE),
+         survey_name_within = sprintf("%s_within", survey_name)) %>%
+  group_by(survey_name) %>%
+  mutate(value_sd = sd(value_within, na.rm = TRUE),
+         value_within = value_within / value_sd) %>%
+  ungroup() %>%
+  select(-value, -value_sd, -survey_name) %>%
+  spread(survey_name_within, value_within)
+
+data_mod_diss = messages %>%
+  group_by(survey_name, SID) %>%
+  mutate(trial = row_number()) %>%
+  spread(survey_name, value) %>%
+  left_join(., between) %>%
+  left_join(., within) %>%
+  ungroup() %>%
+  mutate(SID = as.factor(SID)) %>%
+  unique() %>%
+  select(-msg_sharing_broad_between, -msg_sharing_broad_within, -msg_sharing_narrow_between, -msg_sharing_narrow_within) %>%
+  gather(sharing_type, msg_share, contains("sharing")) %>%
+  mutate(sharing_type = ifelse(sharing_type == "msg_sharing_broad", 0, 1)) %>%
+  mutate(study = "study 6",
+         group = cond,
+         item = sprintf("%s_%s", content, article_number),
+         SID = sprintf("%s_%s", study, SID)) %>%
+  select(study, group, SID, item, article_cond, content, trial, sharing_type, msg_share, contains("rel_"))
+
+```
+
+# tidy demographic data
+```{r}
+demo = data_raw %>%
+  filter(grepl("gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)) %>%
+  ungroup() %>%
+  select(SID, item, value) %>%
+  mutate(value = ifelse(grepl("hispanic_latinx", item), recode(value, "1" = "Yes", "0" = "No"), value),
+         value = ifelse(grepl("gender", item), recode(value, "1" = "Man", "2" = "Non-binary / third gender", "3" = "Woman", 
+                                                      "4" = "Prefer to self-describe", "5" = "Prefer not to say"), value),
+         value = ifelse(grepl("race", item), recode(value, "1" = "White", "2" = "Black or African American", 
+                                                    "3" = "Asian", "4" = "American Indian or Alaskan Native", 
+                                                    "5" = "Native Hawaiian or Other Pacific Islander",
+                                                    "6" = "More than one race", "7" = "Prefer not to say"), value),
+         value = ifelse(grepl("degree", item), recode(value, "1" = "Less than high school", "2" = "High school graduate (diploma)", 
+                                                    "3" = "High school graduate (GED)", "4" = "Some college (1-4 years, no degree)", 
+                                                    "5" = "Associate's degree (including occupational or academic degrees)", 
+                                                    "6" = "Bachelor's degree (BA, BS, etc)",
+                                                    "7" = "Master's degree (MA, MS, MENG, MSW, etc)",
+                                                    "8" = "Professional school degree (MD, DDC, JD, etc)",
+                                                    "9" = "Doctorate degree (PhD, EdD, etc)"), value),
+         value = ifelse(grepl("household", item), recode(value, "1" = "Less than $5,000", "2" = "$5,000 through $11,999", 
+                                                    "3" = "$12,000 through $15,999", "4" = "$16,000 through $24,999", 
+                                                    "5" = "$25,000 through $34,999", "6" = "$35,000 through $49,999",
+                                                    "7" = "$50,000 through $74,999", "8" = "$75,000 through $99,999",
+                                                    "9" = "$100,000 and greater", "10" = "NA", "11" = "NA"), value),
+         item = gsub("ses_income_household", "household income", item),
+         item = gsub("ses_degree", "highest degree completed", item),
+         value = gsub("Alaska ", "Alaskan ", value),
+         item = gsub("hispanic_latinx", "Hispanic or Latinx", item)) %>%
+  spread(item, value) %>%
+  mutate(race = ifelse(is.na(race), race_self, race),
+         gender = ifelse(gender == "Prefer to self-describe", gender_4_TEXT, gender),
+         study = "study 6",
+         SID = sprintf("%s_%s", study, SID)) %>%
+  gather(item, value, -SID, -study)
+```
+
+# write csvs
+```{r}
+write.csv(data_mod_diss, "../data/study6.csv", row.names = FALSE)
+write.csv(demo, "../data/study6_demo.csv", row.names = FALSE)
+```
+

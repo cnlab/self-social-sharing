@@ -1,0 +1,319 @@
+---
+title: "Study 2 data cleaning"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script cleans the raw data from Study 2.
+
+# load packages
+```{r}
+if (!require(tidyverse)) {
+  install.packages('tidyverse')
+}
+if (!require(knitr)) {
+  install.packages('knitr')
+}
+if (!require(DT)) {
+  install.packages('DT')
+}
+if (!require(devtools)) {
+  install.packages('devtools')
+}
+if (!require(scorequaltrics)) {
+  devtools::install_github('dcosme/qualtrics', ref = "dev/enhance")
+}
+```
+
+# define variables and paths
+
+To pull data from Qualtrics, you need a credentials file with an API token associated with your account. To create the file, follow these steps.
+
+1. Generate an API token for Qualtrics. Follow the steps outlined [here](https://www.qualtrics.com/support/integrations/api-integration/overview/).
+
+2. Save a Qualtrics credentials text file with the following format. In this example, the file is being saved as `~/credentials.yaml.PENN`. The `baseurl` is the URL for your institution on Qualtrics. Use `upenn.co1.qualtrics.com` for Penn Qualtrics.
+
+```
+token: oILNW6...[your qualtrics API token]
+baseurl: upenn.co1.qualtrics.com
+```
+
+`cred_file_location` = path to your Qualtrics credential file. 
+
+`survey_name_filter` = regular expression to filter the available surveys
+
+```{r}
+keep_columns = '(ResponseId|MID|Finished|Progress|group)'
+cred_file_location = "~/credentials.yaml.PENN"
+survey_name_filter = "SHORT"
+ignore_items = "ResponseId|IPAddress|RecipientFirstName|RecipientLastName|RecipientEmail|ExternalReference|LocationLatitude|LocationLongitude"
+```
+
+# filter matching surveys
+```{r}
+# load credential file
+credentials = scorequaltrics::creds_from_file(cred_file_location)
+
+# filter
+surveysAvail = scorequaltrics::get_surveys()
+surveysFiltered = filter(surveysAvail, grepl(survey_name_filter, name))
+knitr::kable(arrange(select(surveysFiltered, name), name))
+```
+
+
+# fetch qualtrics data
+The Qualtrics API is pretty finicky. If you get the following error, just rerun the `get_survey_data` command until it works:
+
+```
+Error in qualtrics_response_codes(f, raw = TRUE) : 
+  Qualtrics API complains that the requested resource cannot be found (404 error).
+Please check if you are using the correct survey ID.
+```
+
+```{r}
+# get data
+surveys_long = scorequaltrics::get_survey_data(surveysFiltered,
+                                               credentials, 
+                                               pid_col = keep_columns) %>%
+               filter(!grepl(ignore_items, item)) %>% #filter out identifiable data
+  select(survey_name, group, ResponseId, MID, Finished, Progress, item, value)
+
+# print first 10 rows
+head(surveys_long, 10)
+```
+
+# tidy
+```{r}
+surveys_included = surveys_long %>%
+  filter(!is.na(MID)) %>% #remove test responses
+  filter(!is.na(group)) %>% # remove participants who failed screener
+  filter(!grepl("_DO_", item) & !grepl("stims", item)) %>% #ignore order and stimuli
+  select(-MID)
+
+surveys_no_msg = surveys_included %>%
+  filter(!grepl("msg", item)) %>%
+  extract(item, "scale_name", "(.*)_[0-9]+", remove = FALSE) %>%
+  mutate(scale_name = ifelse(is.na(scale_name), item, scale_name))
+
+# get completed messages and remove condition info
+messages = surveys_included %>%
+  filter(grepl("msg", item)) %>%
+  filter(!is.na(value)) %>%
+  extract(item, c("item", "question"), "([1-5])_.*_(msg.*)", remove = FALSE) %>% #rename message items
+  mutate(scale_name = ifelse(grepl("1", question), "msg_rel_self",
+                      ifelse(grepl("2", question), "msg_rel_social",
+                      ifelse(grepl("3", question), "msg_motiv_vote",
+                      ifelse(grepl("4", question), "msg_motiv_talk",
+                      ifelse(grepl("5", question), "msg_share",
+                      ifelse(grepl("6", question), "msg_emo_positive", "msg_emo_negative"))))))) %>%
+  select(-question)
+
+# create new SIDs
+sids = surveys_included %>%
+  select(ResponseId) %>%
+  unique() %>%
+  ungroup() %>%
+  mutate(SID = sprintf("s%03d", row_number()))
+
+# merge
+surveys = surveys_no_msg %>%
+  bind_rows(messages) %>%
+  left_join(., sids) %>%
+  arrange(SID) %>%
+  select(survey_name, group, SID, scale_name, item, value)
+```
+
+# quality checks
+## failed checks
+* The correct answer for the English check is the school bus, but let's be lenient and accept the truck as well
+
+```{r}
+# identify failed attention checks
+failed_attn = surveys %>%
+  filter((item == "attention_1" & !grepl("How do", value)) |
+           (item == "attention_2" & !grepl("How do", value))) %>%
+  select(SID, item, value) %>%
+  mutate(value = 1) %>%
+  spread(item, value) %>%
+  mutate_if(is.numeric, ~ifelse(is.na(.), 0, .)) %>%
+  mutate(n_failed = attention_1 + attention_2)
+  
+# identify failed English checks
+failed_english = surveys %>%
+  filter(item == "english") %>%
+  filter(!grepl("bus|truck|truk", tolower(value))) %>% 
+  select(SID, value) %>%
+  unique()
+
+# print number of failed checks
+failed = surveys %>% 
+  select(SID) %>% 
+  unique() %>% 
+  mutate(`failed attention` = ifelse(SID %in% failed_attn$SID, 1, 0), 
+         `failed english` = ifelse(SID %in% failed_english$SID, 1, 0), 
+         `failed english & attention` = ifelse(`failed attention` == 1 & `failed english` == 1, 1, 0),
+         `failed at least one check`  = ifelse(`failed attention` == 1 | `failed english`, 1, 0))
+
+failed_subs = failed %>%
+  filter(`failed at least one check` == 1)
+
+failed %>%
+  gather(check, val, contains("fail")) %>% 
+  filter(val == 1) %>% 
+  group_by(check) %>% 
+  summarize(n = n(),
+            `%` = round(n / nrow(failed) * 100, 1)) %>%
+  arrange(desc(n)) %>%
+  kable(format = "pandoc")
+```
+
+## invariance
+Goal is to identify participants who are responding the same way across all items within a survey
+
+* Calculate the SD for each survey for each individual
+* Single item scales are not included
+* If SD = 0, code as invariant and calculate the percentage of invariant surveys for each participant
+
+```{r, fig.width = 8}
+invariance = surveys %>%
+  select(SID, scale_name, value) %>%
+  group_by(SID, scale_name) %>%
+  summarize(sd_scale = sd(as.numeric(value), na.rm = TRUE)) %>%
+  filter(!is.na(sd_scale)) %>%
+  group_by(SID) %>%
+  mutate(completed_variance = ifelse(!(is.na(sd_scale) | is.nan(sd_scale)), 1, 0),
+         n_survey = sum(completed_variance, na.rm = TRUE),
+         invariant = ifelse(sd_scale == 0, 1, 0),
+         sum_invariant = sum(invariant, na.rm = TRUE),
+         percent_surveys_invariant = (sum_invariant / n_survey ) * 100) %>%
+  select(SID, scale_name, sd_scale, percent_surveys_invariant) %>%
+  ungroup() %>%
+  select(SID, percent_surveys_invariant) %>%
+  unique() %>%
+  mutate(median = median(percent_surveys_invariant, na.rm = TRUE),
+         uppersd2 = median + (2 * sd(percent_surveys_invariant, na.rm = TRUE)),
+         uppersd3 = median + (3 * sd(percent_surveys_invariant, na.rm = TRUE)),
+         greater_than_2sd_invariance = ifelse(percent_surveys_invariant > uppersd2, 1, 0),
+         greater_than_3sd_invariance = ifelse(percent_surveys_invariant > uppersd3, 1, 0))
+
+invariance %>%
+  ggplot(aes(percent_surveys_invariant)) +
+    geom_histogram(alpha = .5) +
+    geom_freqpoly() +
+    geom_vline(aes(xintercept = median)) +
+    annotate("text", label = sprintf("Median = %s", round(unique(invariance$median), 1)), 
+             x = unique(invariance$median) + 5, y = 145, size = 2.5) + 
+    geom_vline(aes(xintercept = uppersd2), linetype = "dotted") +
+    annotate("text", label = sprintf("+2 SD = %s", round(unique(invariance$uppersd2), 1)), 
+             x = unique(invariance$uppersd2) + 5, y = 145, size = 2.5) + 
+    geom_vline(aes(xintercept = uppersd3), linetype = "dotted") +
+    annotate("text", label = sprintf("+3 SD = %s", round(unique(invariance$uppersd3), 1)), 
+             x = unique(invariance$uppersd3) + 5, y = 145, size = 2.5) + 
+    labs(x = "percent invariance across surveys") +
+    theme_minimal()
+```
+
+### print survey data for participants with invariance > 3 SDs from the median
+```{r}
+invariant_subs = invariance %>%
+  filter(greater_than_3sd_invariance == 1)
+
+surveys %>% 
+  filter(SID %in% invariant_subs$SID) %>%
+  left_join(., select(invariance, SID, percent_surveys_invariant)) %>%
+  select(SID, percent_surveys_invariant, everything()) %>%
+  mutate(percent_surveys_invariant = round(percent_surveys_invariant, 1)) %>%
+  arrange(desc(percent_surveys_invariant)) %>%
+  rename("% invariant" = percent_surveys_invariant) %>%
+  DT::datatable(rownames = FALSE, extensions = 'FixedColumns', options = list(scrollX = TRUE,
+                                                                              fixedColumns = list(leftColumns = 1)))
+```
+
+### combine quality indicators
+Quality indicators:
+
+* Failed attention or English
+* Invariance > 3 SDs from the median
+
+```{r}
+quality_check_all = invariance %>%
+  select(SID, percent_surveys_invariant, greater_than_3sd_invariance) %>%
+  left_join(., select(failed, SID, `failed attention`, `failed english`)) %>%
+  gather(var, val, contains("fail"), contains("than")) %>%
+  group_by(SID) %>%
+  mutate(var = gsub(" ", "_", var),
+         n_indicators = sum(val),
+         percent_surveys_invariant = round(percent_surveys_invariant, 1)) %>%
+  spread(var, val) %>% 
+  filter(n_indicators > 0) %>%
+  rename("invariance_3_SD" = greater_than_3sd_invariance) %>%
+  arrange(desc(n_indicators)) 
+
+quality_check_all %>%
+  DT::datatable(filter = "top", rownames = FALSE, extensions = 'FixedColumns', 
+                options = list(scrollX = TRUE, fixedColumns = list(leftColumns = 2)))
+``` 
+
+# exclude participants
+
+Number of participants before exclusions = `r nrow(failed)`  
+Number of participants after exclusions = `r nrow(filter(failed, !SID %in% quality_check_all$SID))`  
+Number excluded = `r nrow(quality_check_all)`
+
+Participants are excluded for:
+
+* Failing at least one attention check (N = `r nrow(filter(quality_check_all, n_indicators == 1 & failed_attention == 1))`)
+* Failing the English comprehension check (N = `r nrow(filter(quality_check_all, n_indicators == 1 & failed_english == 1))`)
+* Having invariance > 3 SDs from the median across people (N = `r nrow(filter(quality_check_all, n_indicators == 1 & invariance_3_SD == 1))`)
+* More than one reason (N = `r nrow(filter(quality_check_all, n_indicators > 1))`)
+
+```{r}
+# filter failed attn check and replace messages 
+surveys_clean = surveys %>%
+  filter(!SID %in% quality_check_all$SID) # exclude participants
+```
+
+# summarize survey ns
+```{r}
+surveys_clean %>%
+  select(group, SID) %>%
+  unique() %>%
+  group_by(group) %>%
+  summarize(n = n())
+
+surveys_clean %>%
+  filter(!is.na(value)) %>%
+  group_by(scale_name) %>%
+  select(SID, scale_name) %>%
+  unique() %>%
+  summarize(n = n()) %>%
+  DT::datatable(filter = "top", rownames = FALSE)
+```
+
+# write csvs
+```{r}
+write.csv(surveys_clean, "../data/study2_clean_long.csv", row.names = FALSE)
+```

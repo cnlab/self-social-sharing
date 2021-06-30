@@ -1,0 +1,145 @@
+---
+title: "Study 3 Prep"
+author: "Dani Cosme"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+options(scipen=999)
+```
+
+This document provides the code for the analyses reported in:
+
+[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
+Correlational and causal evidence from six studies]()
+
+This script tidies and prepares the cleaned data from Study 3.
+
+# load packages
+```{r}
+if(!require('pacman')) {
+	install.packages('pacman')
+}
+
+pacman::p_load(tidyverse)
+```
+
+# load and tidy message data
+
+Create disaggregated dataset
+
+* Between-person variables are grand mean centered and standardized across people
+* Within-person variables are centered within-person and standardized across people
+
+```{r}
+data_raw = read.csv("../data/study3_clean_long.csv", stringsAsFactors = FALSE)
+
+messages = data_raw %>%
+  filter(grepl("sharing|rel_self|rel_social", survey_name)) %>%
+  extract(item, "item", ".*_([0-9]+)") %>%
+  mutate(value = as.numeric(value))
+
+between = messages %>%
+  group_by(survey_name, SID) %>%
+  summarize(value_between = mean(value, na.rm = TRUE)) %>%
+  group_by(survey_name) %>%
+  mutate(value_between = scale(value_between, scale = TRUE, center = TRUE),
+         survey_between = sprintf("%s_between", survey_name)) %>%
+  ungroup() %>%
+  select(-survey_name) %>%
+  spread(survey_between, value_between)
+
+within = messages %>%
+  group_by(survey_name, SID) %>%
+  mutate(trial = row_number(),
+         value_within = scale(value, scale = FALSE, center = TRUE),
+         survey_name_within = sprintf("%s_within", survey_name)) %>%
+  group_by(survey_name) %>%
+  mutate(value_sd = sd(value_within, na.rm = TRUE),
+         value_within = value_within / value_sd) %>%
+  ungroup() %>%
+  select(-value, -value_sd, -survey_name) %>%
+  spread(survey_name_within, value_within)
+
+data_mod_diss = messages %>%
+  group_by(survey_name, SID) %>%
+  mutate(trial = row_number()) %>%
+  spread(survey_name, value) %>%
+  left_join(., between) %>%
+  left_join(., within) %>%
+  ungroup() %>%
+  mutate(SID = as.factor(SID)) %>%
+  unique() %>%
+  select(-msg_sharing_broad_between, -msg_sharing_broad_within, -msg_sharing_narrow_between, -msg_sharing_narrow_within) %>%
+  gather(sharing_type, msg_share, contains("sharing")) %>%
+  mutate(sharing_type = ifelse(sharing_type == "msg_sharing_broad", 0, 1)) %>%
+  mutate(study = "study 3",
+         item = sprintf("%s_%s_%s", study, group, item),
+         SID = sprintf("%s_%s", study, SID),
+         content = "voting") %>%
+  select(study, group, SID, item, content, trial, sharing_type, msg_share, contains("rel_"))
+```
+
+# tidy demographic data
+```{r}
+demo = data_raw %>%
+  filter(grepl("gender|race$|hispanic_latinx|student_grade", item)) %>%
+  ungroup() %>%
+  select(SID, item, value) %>%
+  mutate(value = ifelse(item %in% c("gender"),
+                        yes = recode(value, "1" = "Man",
+                                     "2" = "Non-binary / third gender",
+                                     "3" = "Woman",
+                                     "4" = "Prefer to self-describe",
+                                     "5" = "Prefer not to say"),
+                        no = value),
+          value = ifelse(item %in% c("hispanic_latinx"),
+                        yes = recode(value, "1" = "Yes",
+                                     "0" = "No",
+                                     "2" = "Prefer not to say"),
+                        no = value),
+          value = ifelse(item %in% c("race"),
+                        yes = recode(value, "1" = "American Indian or Alaskan Native",
+                                     "2" = "Asian",
+                                     "3" = "Black or African American",
+                                     "4" = "Native Hawaiian or other Pacific Islander",
+                                     "5" = "White",
+                                     "6" = "More than one race",
+                                     "7" = "Prefer not to say"),
+                        no = value),
+         value = ifelse(item %in% c("student_grade"),
+                        yes = recode(value, "1" = "First year",
+                                     "2" = "Second year",
+                                     "3" = "Third year",
+                                     "4" = "Fourth year",
+                                     "5" = "Fifth year or higher"),
+                        no = value),
+         item = gsub("hispanic_latinx", "Hispanic or Latinx", item)) %>%
+  spread(item, value) %>%
+  mutate(race = ifelse(is.na(race), race_self, race),
+         gender = ifelse(gender == "Prefer to self-describe", gender_4_TEXT, gender),
+         study = "study 3",
+         SID = sprintf("%s_%s", study, SID)) %>%
+  gather(item, value, -SID, -study)
+```
+
+# write csvs
+```{r}
+write.csv(data_mod_diss, "../data/study3.csv", row.names = FALSE)
+write.csv(demo, "../data/study3_demo.csv", row.names = FALSE)
+```
+
