@@ -3,7 +3,6 @@ This repository contains code for the analyses reported in the following manuscr
 
 **Message self and social relevance is positively related to sharing intentions: Correlational and causal evidence from six studies**
 
----
 
 ## Compiled analysis files
 
