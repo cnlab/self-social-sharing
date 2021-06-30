@@ -3,7 +3,22 @@ This repository contains code for the analyses reported in the following manuscr
 
 **Message self and social relevance is positively related to sharing intentions: Correlational and causal evidence from six studies**
 
-directory structure
+--
+
+## Compiled analysis files
+
+Demographic information is reported [here](/self_social_sharing/analysis/demographic)
+
+The correlational analyses are reported [here](/self_social_sharing/analysis/correlational)
+
+The causal analyses are reported [here](/self_social_sharing/analysis/correlational)
+
+The specification curve analyses are reported [here](/self_social_sharing/analysis/sca)
+
+The downsampled analyses are reported [here](/analysis/downsampled)
+
+
+## Directory structure
 
 * analysis = R code for the analyses reported in the manuscript and supplementary material
 * cleaning = R code and supporting files for cleaning the data
