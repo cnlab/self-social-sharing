@@ -1,4 +1,4 @@
-# self_social_sharing
+# self-social-sharing
 This repository contains code for the analyses reported in the following manuscript:
 
 **Message self and social relevance is positively related to sharing intentions: Correlational and causal evidence from six studies**
@@ -14,7 +14,7 @@ The causal analyses are reported [here](https://cnlab.github.io/self_social_shar
 
 The specification curve analyses are reported [here](https://cnlab.github.io/self_social_sharing/analysis/sca)
 
-The downsampled analyses are reported [here](https://cnlab.github.io/self_social_sharing/analysis/downsampled)
+The downsampled analyses are reported [here](https://cnlab.github.io/self_social_sharing/analysis/downsampled_analysis)
 
 
 ## Directory structure
