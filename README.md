@@ -21,8 +21,9 @@ To reproduce the analyses in the manuscript, first execute the study cleaning sc
 
 ## Directory structure
 
-* analysis = R code for the analyses reported in the manuscript and supplementary material
-* cleaning = R code and supporting files for cleaning the data
+* `analysis` = R code for the analyses reported in the manuscript and supplementary material
+* `cleaning` = R code and supporting files for cleaning the data
+* `stimuli` = text files containing the stimuli from Studies 5 and 6
 
 ````
 ├── analysis
@@ -62,4 +63,7 @@ To reproduce the analyses in the manuscript, first execute the study cleaning sc
 	├── cleaning_script_study5.Rmd
 	├── cleaning_script_study6.Rmd
 	└── state_codes.csv
+└── stimuli
+    ├── study5_articles.csv
+    └── study6_articles.csv
 ```
