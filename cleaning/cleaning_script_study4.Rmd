@@ -48,7 +48,7 @@ if (!require(reshape2)) {
 # load qualtrics data
 
 ```{r}
-surveys_raw = read.csv("../../nyt_emotion_study/nytimes+--+emotion+piloting_March+30,+2021_10.47.csv",
+surveys_raw = read.csv("../../bbprime-behavioral/nyt_emotion_study/nytimes+--+emotion+piloting_March+30,+2021_10.47.csv",
                        stringsAsFactors = FALSE)
 ```
 
@@ -95,7 +95,8 @@ exclude_english = surveys_rename %>%
 
 ```
 
-# exclude participants
+# exclude participants and select relevant variables
+
 Number of participants before exclusions = `r nrow(surveys_rename)`
 
 Number of participants after exclusions = `r nrow(surveys_rename %>% filter(!ResponseId %in% c(exclude_english$ResponseId)))`
@@ -111,7 +112,7 @@ surveys_include = surveys_rename %>%
   filter(!ResponseId %in% c(exclude_english$ResponseId))
 ```
 
-# tidy
+# tidy and select relevant variables
 ```{r}
 surveys_tidy = surveys_include %>%
   gather(item, value, contains("Q3.5"), contains("Q4.5"),

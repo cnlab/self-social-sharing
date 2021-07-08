@@ -71,7 +71,7 @@ states = read.csv("state_codes.csv", stringsAsFactors = FALSE) %>%
   mutate(state_code = as.character(state_code))
 
 # load message info
-message_info = read.csv("../../../covid19-message-framing-private/humor/message_info.csv", stringsAsFactors = FALSE) %>%
+message_info = read.csv("../../covid19-message-framing-private/humor/message_info.csv", stringsAsFactors = FALSE) %>%
   dplyr::rename("message_text" = text) %>%
   mutate(condition = gsub(" ", "", condition),
          condition = tolower(condition),
@@ -83,7 +83,7 @@ message_info = read.csv("../../../covid19-message-framing-private/humor/message_
   dplyr::select(condition, message, message_text, behavior)
 
 # load and tidy survey
-surveys = read.csv("../../../covid19-message-framing-private/humor/COVID-19 Humor Study_April 15, 2020_22.00.csv", stringsAsFactors = FALSE) %>%
+surveys = read.csv("../../covid19-message-framing-private/humor/COVID-19 Humor Study_April 15, 2020_22.00.csv", stringsAsFactors = FALSE) %>%
   slice(3:n()) %>%
   filter(!DistributionChannel == "preview") %>% # remove preview responses
   filter(!mturk_code == "") %>% # remove participants who failed screener
@@ -388,7 +388,7 @@ Removing the duration as an exclusion criteria results in excluding `r round(nro
 
 Just excluding based on failed checks results in excluding `r round(nrow(quality_check_failed) / nrow(dur_plot_data) * 100, 1)`% of participants (n = `r nrow(quality_check_failed)`)
 
-# exclude participants
+# exclude participants and select relevant variables
 
 Number of participants before exclusions = `r nrow(filter(surveys_merged_wide))`  
 Number of participants after exclusions = `r nrow(filter(surveys_merged_wide, !SID %in% quality_check_notime$SID))`  
@@ -404,7 +404,8 @@ Participants are excluded for:
 ```{r}
 surveys_clean = surveys_merged %>%
   filter(!SID %in% quality_check_notime$SID) %>% # exclude participants
-  select(SID, condition, survey_name, item, value)
+  select(SID, condition, survey_name, item, value) %>%
+  filter(grepl("msg_rel|msg_share|gender|race|hispanic_latino|ses_degree|income_household|^age$|state", item)) # filter relevant variables
 ```
 
 # summarize condition and survey ns

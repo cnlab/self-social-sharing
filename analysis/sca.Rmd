@@ -368,7 +368,7 @@ if (!file.exists("models/sca_output_3b.RDS")) {
 
 ## tidy output
 ```{r}
-output1 = bind_rows(output_12, output_3a, output_3b) %>%
+output = bind_rows(output_12, output_3a, output_3b) %>%
   mutate(x = gsub("msg_rel_", "", x),
          x = gsub("_", " ", x),
          content = ifelse(grepl("covid", subsets), "COVID-19",
@@ -810,28 +810,28 @@ plot_sca_compare = function(data, pointrange = TRUE, labels = c("A", "B"),
 ## main manuscript plot
 This plot is reported in Figure 3.
 ```{r, fig.width=14, fig.height=16}
-self_between = plot_sca(data = filter(output1, grepl("self between", x)), combined = TRUE, title = TRUE,
+self_between = plot_sca(data = filter(output, grepl("self between", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "medium", palette = palette[3:4],
          remove_facet = TRUE, labels = c("", ""), median_size = 1,
          choices = c("content", "medium", "sharing", "controls"), limits = c(-.3, 1),
          collapse_content = TRUE)
 
-social_between = plot_sca(data = filter(output1, grepl("social between", x)), combined = TRUE, title = TRUE,
+social_between = plot_sca(data = filter(output, grepl("social between", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(.5, 1), text_size = 18,
          color_vars = "medium", palette = palette[3:4],
          remove_y = TRUE, labels = c("", ""), median_size = 1,
          choices = c("content", "medium", "sharing", "controls"), limits = c(-.3, 1),
          collapse_content = TRUE)
 
-self_within = plot_sca(data = filter(output1, grepl("self within", x)), combined = TRUE, title = TRUE,
+self_within = plot_sca(data = filter(output, grepl("self within", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "sharing", palette = palette_sharing,
          remove_facet = TRUE, labels = c("", ""), median_size = 1,
          choices = c("content", "medium", "sharing", "controls"), limits = c(-0, .4),
          collapse_content = TRUE)
 
-social_within = plot_sca(data = filter(output1, grepl("social within", x)), combined = TRUE, title = TRUE,
+social_within = plot_sca(data = filter(output, grepl("social within", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "sharing", palette = palette_sharing,
          remove_y = TRUE, labels = c("", ""), median_size = 1,
@@ -847,7 +847,7 @@ ggarrange(self_between, social_between, self_within, social_within,
 This plot is reported in Figure S5.
 
 ```{r, fig.width=12, fig.height=14}
-plot_sca(data = output1, combined = TRUE, title = FALSE, text_size = 20, median_size = 1.25,
+plot_sca(data = output, combined = TRUE, title = FALSE, text_size = 20, median_size = 1.25,
          color_vars = "x", palette = palette_relevance, alpha_values = c(.2, .5),
          choices = c("relevance", "content", "medium", "sharing", "controls"),
          collapse_content = TRUE)
@@ -858,14 +858,14 @@ plot_sca(data = output1, combined = TRUE, title = FALSE, text_size = 20, median_
 This plot is reported in Figure S3.
 
 ```{r, fig.width=14, fig.height=14}
-self_between_subset = plot_sca(data = filter(output1, grepl("self between", x)), combined = TRUE, title = TRUE,
+self_between_subset = plot_sca(data = filter(output, grepl("self between", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "medium", palette = palette[3:4],
          remove_facet = TRUE, labels = c("", ""), median_size = 1,
          choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-.3, 1),
          collapse_content = TRUE)
 
-social_between_subset= plot_sca(data = filter(output1, grepl("social between", x)), combined = TRUE, title = TRUE,
+social_between_subset= plot_sca(data = filter(output, grepl("social between", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(.5, 1), text_size = 18,
          color_vars = "medium", palette = palette[3:4],
          remove_y = TRUE, labels = c("", ""), median_size = 1,
@@ -879,14 +879,14 @@ ggarrange(self_between_subset, social_between_subset, ncol = 2, labels = c("A", 
 This plot is reported in Figure S4.
 
 ```{r, fig.width=14, fig.height=14}
-self_within_subset = plot_sca(data = filter(output1, grepl("self within", x)), combined = TRUE, title = TRUE,
+self_within_subset = plot_sca(data = filter(output, grepl("self within", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "sharing", palette = palette_sharing,
          remove_facet = TRUE, labels = c("", ""), median_size = 1,
          choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-0, .4),
          collapse_content = TRUE)
 
-social_within_subset = plot_sca(data = filter(output1, grepl("social within", x)), combined = TRUE, title = TRUE,
+social_within_subset = plot_sca(data = filter(output, grepl("social within", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "sharing", palette = palette_sharing,
          remove_y = TRUE, labels = c("", ""), median_size = 1,
@@ -900,7 +900,7 @@ ggarrange(self_within_subset, social_within_subset, ncol = 2, labels = c("A", "B
 This plot is reported in Figure 2.
 
 ```{r, fig.width=6, fig.height=6}
-plot_sca_compare(data = output1, pointrange = FALSE, n_rows = 2, rel_heights = c(.5, .5))
+plot_sca_compare(data = output, pointrange = FALSE, n_rows = 2, rel_heights = c(.5, .5))
 ```
 
 # tables {.tabset}
@@ -910,10 +910,10 @@ Descriptive stats for the curve of each relevance variable.
 This table is reported in Table 4.
 
 ```{r}
-n_models = output1 %>%
+n_models = output %>%
   filter(relevance == "self within")
 
-output1 %>%
+output %>%
   mutate(positive = ifelse(estimate > 0, 1, 0),
          negative = ifelse(estimate < 0, 1, 0),
          sig = case_when(conf.low > 0 ~ 1,
@@ -938,15 +938,15 @@ output1 %>%
 This table is reported in Table S4.
 
 ```{r}
-n_broadcast = output1 %>%
+n_broadcast = output %>%
   filter(sharing == "broadcast") %>%
   filter(relevance == "self between")
 
-n_narrowcast = output1 %>%
+n_narrowcast = output %>%
   filter(sharing == "narrowcast") %>%
   filter(relevance == "self between")
 
-output1 %>%
+output %>%
   mutate(positive = ifelse(estimate > 0, 1, 0),
          negative = ifelse(estimate < 0, 1, 0),
          sig = case_when(conf.low > 0 ~ 1,
@@ -974,15 +974,15 @@ output1 %>%
 This table is reported in Table S4.
 
 ```{r}
-n_social = output1 %>%
+n_social = output %>%
   filter(medium == "social media") %>%
   filter(relevance == "self between")
 
-n_newspaper = output1 %>%
+n_newspaper = output %>%
   filter(medium == "newspaper") %>%
   filter(relevance == "self between")
 
-output1 %>%
+output %>%
   mutate(positive = ifelse(estimate > 0, 1, 0),
          negative = ifelse(estimate < 0, 1, 0),
          sig = case_when(conf.low > 0 ~ 1,

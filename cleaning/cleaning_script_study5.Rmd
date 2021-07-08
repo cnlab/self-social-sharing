@@ -207,10 +207,10 @@ failed %>%
   kable(format = "pandoc")
 ```
 
-# exclude participants
+# exclude participants and select relevant variables
 
 Number of participants before exclusions = `r nrow(surveys_wide)`  
-Number of participants after exclusions = `r nrow(filter(surveys_wide, !SID %in% failed_subs$SID))` 
+Number of participants after exclusions = `r nrow(filter(surveys_wide, !SID %in% failed_subs$SID))`  
 Number excluded = `r nrow(failed_subs)`
 
 Participants are excluded for:
@@ -226,7 +226,8 @@ Number of participants who failed both attention checks and were removed = `r nr
 surveys_clean = surveys %>%
   filter(!SID %in% failed_subs$SID) %>% # exclude participants
   filter(!item == "MID") %>% #remove MIDs 
-  select(SID, survey_name, item, value)
+  select(SID, survey_name, item, value) %>%
+  filter(grepl("relevance_self|relevance_social|sharing|stim_order|gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)) # filter relevant variables
 ```
 
 # summarize survey ns

@@ -98,7 +98,6 @@ data_mod_diss = data %>%
 ```
 
 # tidy demographic data
-
 ```{r, eval = FALSE}
 demo = data %>%
   select(SID, age, gender) %>%
@@ -115,4 +114,3 @@ demo = data %>%
 write.csv(data_mod_diss, "../data/study4.csv", row.names = FALSE)
 write.csv(demo, "../data/study4_demo.csv", row.names = FALSE)
 ```
-

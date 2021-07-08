@@ -176,7 +176,7 @@ failed_english = surveys %>%
 Dani and José checked the comments and excluded people based on the SOPs.
 
 ```{r}
-comments = read.csv("../../causal_study/mturk/review_data_annot.csv", stringsAsFactors = FALSE) %>%
+comments = read.csv("../../bbprime-behavioral/causal_study/mturk/review_data_annot.csv", stringsAsFactors = FALSE) %>%
   select(SID, ResponseId, MID, reject, exclude, should.have.been.excluded) %>%
   unique() %>%
   filter(!(reject == "" & exclude == ""))
@@ -246,7 +246,7 @@ rejected %>%
   kable(format = "pandoc")
 ```
 
-# exclude participants
+# exclude participants and select relevant variables
 
 Number of participants before exclusions = `r nrow(surveys_wide)`  
 Number of participants after exclusions = `r nrow(filter(surveys_wide, !SID %in% failed_subs$SID))`  
@@ -266,7 +266,8 @@ Number of participants who's HIT was rejected (including for failing both attent
 surveys_clean = surveys %>%
   filter(!SID %in% failed_subs$SID) %>% # exclude participants
   filter(!item == "MID") %>% #remove MIDs 
-  select(cond, SID, survey_name, item, value)
+  select(cond, SID, survey_name, item, value) %>%
+  filter(grepl("relevance_self|relevance_social|sharing|stim_order|cond_order|gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)) # filter relevant variables
 
 # spread to wide format
 surveys_clean_wide = surveys_clean %>%
@@ -292,7 +293,7 @@ surveys_clean %>%
 # output file for response checking
 ```{r}
 # article info
-articles = read.csv("../../causal_study/articles.csv", stringsAsFactors = FALSE)
+articles = read.csv("../../bbprime-behavioral/causal_study/articles.csv", stringsAsFactors = FALSE)
 
 # stim order
 stim_order = surveys %>%
@@ -326,5 +327,4 @@ review_data = surveys %>%
 # write csvs
 ```{r}
 write.csv(surveys_clean, "../data/study6_clean_long.csv", row.names = FALSE)
-#write.csv(review_data, "review_data_2.csv", row.names = FALSE)
 ```

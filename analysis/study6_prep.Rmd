@@ -48,11 +48,7 @@ Create disaggregated dataset
 ```{r}
 data_raw = read.csv("../data/study6_clean_long.csv", stringsAsFactors = FALSE)
 
-article_info = read.csv("../../causal_study/original_stim_list.csv", stringsAsFactors = FALSE) %>%
-  select(main_headline, clicks)
-
-articles = read.csv("../../causal_study/articles.csv", stringsAsFactors = FALSE) %>%
-  left_join(., article_info)
+articles = read.csv("../stimuli/study6_articles.csv", stringsAsFactors = FALSE)
 
 stim_order = data_raw %>%
   filter(grepl("stim_order", survey_name)) %>%

@@ -90,7 +90,7 @@ knitr::kable(arrange(select(surveysFiltered, name), name))
 survey_raw = scorequaltrics::get_survey_responses(surveysFiltered$id[1])
 ```
 
-## tidy data
+## tidy data and select relevant variables
 This code tidies the raw data and outputs a dataframe in the long format with the following columns:
 
 `study` = study name  
@@ -122,7 +122,8 @@ surveys = survey_raw %>%
   extract(item, "survey_name", "(.*)_[0-9]+", remove = FALSE) %>%
   mutate(survey_name = ifelse(is.na(survey_name), item, survey_name),
          survey_name = gsub("[0-9]+_", "", survey_name)) %>%
-  filter(!grepl("_DO_", item)) # remove randomization order info
+  filter(!grepl("_DO_", item)) %>% # remove randomization order info
+  filter(grepl("msg_rel|msg_sharing|gender|race$|hispanic_latinx|student_grade", survey_name)) # filter relevant variables
 
 # spread to wide format
 surveys_wide = surveys %>%
@@ -149,5 +150,4 @@ surveys %>%
 # write csvs
 ```{r}
 write.csv(surveys, "../data/study3_clean_long.csv", row.names = FALSE)
-write.csv(surveys_wide, "../data/study3_clean_wide.csv", row.names = FALSE)
 ```

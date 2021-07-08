@@ -277,7 +277,7 @@ quality_check_all %>%
                 options = list(scrollX = TRUE, fixedColumns = list(leftColumns = 2)))
 ``` 
 
-# exclude participants
+# exclude participants and select relevant variables
 
 Number of participants before exclusions = `r nrow(failed)`  
 Number of participants after exclusions = `r nrow(filter(failed, !SID %in% quality_check_all$SID))`  
@@ -293,7 +293,8 @@ Participants are excluded for:
 ```{r}
 # filter failed attn check and replace messages 
 surveys_clean = surveys %>%
-  filter(!SID %in% quality_check_all$SID) # exclude participants
+  filter(!SID %in% quality_check_all$SID) %>% # exclude participants
+  filter(grepl("msg_rel|msg_share|gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", scale_name)) # filter relevant variables
 ```
 
 # summarize survey ns

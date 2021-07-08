@@ -62,15 +62,6 @@ plot_aes = theme_minimal() +
 
 ## load and merge data
 ```{r}
-# article info
-article_info_study6 = read.csv("../../causal_study/original_stim_list.csv", stringsAsFactors = FALSE) %>%
-  select(main_headline, clicks)
-
-articles = read.csv("../../causal_study/articles.csv", stringsAsFactors = FALSE) %>%
-  left_join(., article_info_study6) %>%
-  mutate(item = sprintf("study 6_%s", article_number)) %>%
-  select(content, item, clicks)
-
 # cleaned study data
 study1 = read.csv("../data/study1.csv", stringsAsFactors = FALSE)
 

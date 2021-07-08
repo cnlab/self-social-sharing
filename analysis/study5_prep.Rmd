@@ -48,7 +48,7 @@ Create disaggregated dataset
 ```{r}
 data_raw = read.csv("../data/study5_clean_long.csv", stringsAsFactors = FALSE)
 
-articles = read.csv("../../correlational_study/articles.csv", stringsAsFactors = FALSE) %>%
+articles = read.csv("../stimuli/study5_articles.csv", stringsAsFactors = FALSE) %>%
   bind_cols(., data.frame(content = rep(c("covid", "climate"), 55))) %>%
   mutate(article_number = row_number()-1)
 

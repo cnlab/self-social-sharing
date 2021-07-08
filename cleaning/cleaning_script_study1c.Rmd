@@ -69,7 +69,7 @@ states = read.csv("state_codes.csv", stringsAsFactors = FALSE) %>%
   mutate(state_code = as.character(state_code))
 
 # load message info
-message_info = read.csv("../../../covid19-message-framing-private/covid19_study1/message_info.csv", stringsAsFactors = FALSE) %>%
+message_info = read.csv("../../covid19-message-framing-private/covid19_study1/message_info.csv", stringsAsFactors = FALSE) %>%
   rename("message_text" = text) %>%
   mutate(condition = gsub(" ", "", condition),
          condition = tolower(condition),
@@ -84,7 +84,7 @@ message_info = read.csv("../../../covid19-message-framing-private/covid19_study1
   select(condition, message, message_text, behavior)
 
 # load and tidy survey
-surveys = read.csv("../../../covid19-message-framing-private/covid19_study1/covid19_study1_qualtrics.csv", stringsAsFactors = FALSE) %>%
+surveys = read.csv("../../covid19-message-framing-private/covid19_study1/covid19_study1_qualtrics.csv", stringsAsFactors = FALSE) %>%
   slice(3:n()) %>%
   filter(!DistributionChannel == "preview") %>% # remove preview responses
   filter(!mturk_code == "") %>% # remove participants who failed screener
@@ -446,7 +446,7 @@ quality_check_notime = quality_check_notime %>%
   filter(!SID %in% no_message_subs$SID) 
 ```
 
-# exclude participants
+# exclude participants and select relevant variables
 
 Number of participants before exclusions = `r nrow(filter(surveys_merged_wide, !SID %in% no_message_subs$SID))`  
 Number of participants after exclusions = `r nrow(filter(surveys_merged_wide, !SID %in% quality_check_notime$SID & !SID %in% no_message_subs$SID))`  
@@ -465,7 +465,8 @@ Participants are excluded for:
 surveys_clean = surveys_merged %>%
   filter(!SID %in% no_message_subs$SID) %>% # remove participants who saw no messages
   filter(!SID %in% quality_check_notime$SID) %>% # exclude participants
-  select(study, condition, SID, survey_name, item, value)
+  select(study, condition, SID, survey_name, item, value) %>%
+  filter(grepl("msg_rel|msg_share|gender|race|hispanic_latino|ses_degree|income_household|^age$|state", item)) # filter relevant variables
 ```
 
 # summarize condition and survey ns

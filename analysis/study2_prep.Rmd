@@ -46,7 +46,7 @@ Create disaggregated dataset
 * Within-person variables are centered within-person and standardized across people
 
 ```{r}
-data_raw = read.csv("../../gotv_study/gotv_clean_long.csv", stringsAsFactors = FALSE)
+data_raw = read.csv("../data/study2_clean_long.csv", stringsAsFactors = FALSE)
 
 messages = data_raw %>%
   filter(grepl("msg", scale_name)) %>%
