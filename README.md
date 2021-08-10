@@ -10,7 +10,7 @@ Demographic information is reported [here](https://cnlab.github.io/self-social-s
 
 The correlational analyses are reported [here](https://cnlab.github.io/self-social-sharing/analysis/correlational)
 
-The causal analyses are reported [here](https://cnlab.github.io/self-social-sharing/analysis/correlational)
+The causal analyses are reported [here](https://cnlab.github.io/self-social-sharing/analysis/causal)
 
 The specification curve analyses are reported [here](https://cnlab.github.io/self-social-sharing/analysis/sca)
 
