@@ -44,12 +44,17 @@ if (!require(kableExtra)) {
 if (!require(lmerTest)) {
   install.packages('lmerTest')
 }
+if (!require(report)) {
+  install.packages('report')
+}
+report::cite_packages()
 ```
 
 ## define aesthetics
 ```{r}
-palette = c("#E64626", "#FF9900", "#FFE136", "#00A896","#1985A1", "#5A69AF")
-palette_sharing = c("#4c5c68", "#B8B3BE")
+palette = c("#001219", "#005F73", "#0A9396", "#94D2BD", "#E9D8A6", "#EE9B00", "#CA6702", "#BB3E03", "#AE2012")
+palette_sharing = c("#0a9396", "#EE9B00")
+palette_study = c("#001219", "#005F73", "#94D2BD", "#E9D8A6", "#EE9B00", "#AE2012")
 
 plot_aes = theme_minimal() +
   theme(legend.position = "top",
@@ -151,7 +156,7 @@ cors %>%
   ggplot(aes(item, estimate, color = study)) +
   geom_point() +
   geom_hline(yintercept = .7) +
-  scale_color_manual(values = palette) +
+  scale_color_manual(values = palette_study) +
   labs(x = "\nmessage number", y = "correlation between\nself and social relevance\n") +
   plot_aes +
   theme(legend.text = element_text(size = 11))
@@ -241,7 +246,7 @@ predicted %>%
   facet_grid(~variable) +
   scale_color_manual(name = "", values = palette_sharing) +
   scale_fill_manual(name = "", values = palette_sharing) +
-  scale_linetype_manual(name = "", values = c("solid", "dotted")) +
+  scale_linetype_manual(name = "", values = c("solid", "dashed")) +
   guides(linetype = guide_legend(override.aes = list(fill = NA))) +
   labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
   plot_aes  +
@@ -323,7 +328,7 @@ cors %>%
   ggplot(aes(item, estimate, color = study)) +
   geom_point() +
   geom_hline(yintercept = .7) +
-  scale_color_manual(values = palette) +
+  scale_color_manual(values = palette_study) +
   labs(x = "\nmessage number", y = "correlation between\nself and social relevance\n") +
   plot_aes +
   theme(legend.text = element_text(size = 11))

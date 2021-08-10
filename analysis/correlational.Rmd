@@ -96,14 +96,17 @@ if (!require(lmerTest)) {
 if (!require(ggpubr)) {
   install.packages('ggpubr')
 }
-
+if (!require(report)) {
+  install.packages('report')
+}
+report::cite_packages()
 ```
 
 ## define aesthetics
 ```{r}
-palette = c("#E64626", "#FF9900", "#FFE136", "#E0BF00", "#00A896","#1985A1", "#165F8D", "#5A69AF", "#393993")
-palette_sharing = c("#4c5c68", "#B8B3BE")
-palette_relevance = c("#A42B13", "#EE6C4D", "#3D5A80", "#98C1D9")
+palette = c("#001219", "#005F73", "#0A9396", "#94D2BD", "#E9D8A6", "#EE9B00", "#CA6702", "#BB3E03", "#AE2012")
+palette_sharing = c("#0a9396", "#EE9B00")
+palette_relevance = c("#bb3e03", "#f14f04", "#005F73", "#0088a3")
 
 plot_aes = theme_minimal() +
   theme(legend.position = "top",
@@ -167,7 +170,7 @@ merged %>%
 ### means, SDs, and corrlations
 Correlations are generated using repeated measures correlations to account for observations nested within participant.
 
-```{r}
+```{r, cache = TRUE}
 # means
 means = data_desc %>%
   gather(variable, val, contains("cast"), contains("rel"), -contains("between")) %>%
@@ -319,7 +322,7 @@ predicted %>%
   facet_grid(~variable) +
   scale_color_manual(name = "", values = palette_sharing) +
   scale_fill_manual(name = "", values = palette_sharing) +
-  scale_linetype_manual(name = "", values = c("solid", "dotted")) +
+  scale_linetype_manual(name = "", values = c("solid", "dashed")) +
   guides(linetype = guide_legend(override.aes = list(fill = NA))) +
   labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
   plot_aes  +

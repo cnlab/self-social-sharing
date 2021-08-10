@@ -74,12 +74,16 @@ if (!require(lmerTest)) {
 if (!require(boot)) {
   install.packages('boot')
 }
+if (!require(report)) {
+  install.packages('report')
+}
+report::cite_packages()
 ```
 
 ## define aesthetics
 ```{r}
-palette_condition = c("#ffb800", "#E64626", "#1985A1")
-palette_sharing = c("#4c5c68", "#B8B3BE")
+palette_condition = c("#ee9b00", "#bb3e03", "#005f73")
+palette_sharing = c("#0a9396", "#ee9b00")
 
 plot_aes = theme_minimal() +
   theme(legend.position = "top",
@@ -92,8 +96,8 @@ plot_aes = theme_minimal() +
 
 ## load data
 ```{r}
-study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE) %>%
-  mutate(sharing_type = ifelse(sharing_type == 0, -.5, .5))
+study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE) #%>%
+  #mutate(sharing_type = ifelse(sharing_type == 0, -.5, .5))
 ```
 
 # manipulation checks {.tabset}
@@ -160,32 +164,31 @@ predicted_h2 = ggeffects::ggpredict(mod_h2, c("article_cond")) %>%
 
 predicted_h3_h4 = ggeffects::ggpredict(mod_h3_h4, c("article_cond", "sharing_type")) %>%
               data.frame() %>%
-  mutate(group = ifelse(group == "-0.5", "broadcast sharing", "narrowcast sharing"))
+  mutate(group = ifelse(group == "0", "broadcast sharing", "narrowcast sharing"))
 
 # manipulation check plot
 check = bind_rows(predicted_h1, predicted_h2) %>%
   ggplot(aes(x = model, y = predicted, color = x)) +
     geom_pointrange(aes( ymin = conf.low, ymax = conf.high), position = position_dodge(.5), size = 1) +
     coord_flip() +
-    scale_fill_manual(name = "", values = palette_condition) +
     scale_color_manual(name = "", values = palette_condition) +
     scale_y_continuous(limits = c(50, 72)) +
     labs(x = "", y = "\nmean predicted rating") +
     plot_aes +
-    theme(legend.position = c(.85, .2))
+    theme(legend.position = c(.85, .15))
 
 # causal analysis plot
 causal = predicted_h3_h4 %>%
   mutate(group = gsub(" sharing", "", group)) %>%
-  ggplot(aes(x = x, y = predicted, color = group)) +
-  geom_pointrange(aes( ymin = conf.low, ymax = conf.high), position = position_dodge(.5), size = 1) +
+  ggplot(aes(x = x, y = predicted, color = x)) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high, alpha = group), position = position_dodge(.5), size = 1) +
   coord_flip() +
-  scale_fill_manual(name = "", values = palette_sharing) +
-  scale_color_manual(name = "", values = palette_sharing) +
+  scale_color_manual(name = "", values = palette_condition, guide = "none") +
+  scale_alpha_manual(name = "", values = c(1, .5)) +
   labs(x = "", y = "\nmean predicted sharing intention rating") +
   scale_y_continuous(limits = c(40, 60)) +
   plot_aes +
-  theme(legend.position = c(.85, .2))
+  theme(legend.position = c(.85, .15))
 
 cowplot::plot_grid(check, causal, labels = c("A", "B"))
 ```
@@ -202,7 +205,7 @@ source("indirectMLM.R")
 data_med_self = study6 %>%
   filter(!article_cond == "social") %>%
   mutate(article_cond = ifelse(article_cond == "self", 1, 0),
-         sharing_type = ifelse(sharing_type == -.5, "broadcast", "narrowcast"),
+         sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast"),
          SID = as.character(SID)) %>%
   spread(sharing_type, msg_share) %>%
   select(SID, article_cond, trial, msg_rel_self, broadcast, narrowcast) %>%
@@ -213,7 +216,7 @@ data_med_self = study6 %>%
 data_med_social = study6 %>%
   filter(!article_cond == "self") %>%
   mutate(article_cond = ifelse(article_cond == "social", 1, 0),
-         sharing_type = ifelse(sharing_type == -.5, "broadcast", "narrowcast"),
+         sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast"),
          SID = as.character(SID)) %>%
   spread(sharing_type, msg_share) %>%
   select(SID, article_cond, trial, msg_rel_social, broadcast, narrowcast) %>%
@@ -241,6 +244,9 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 }
 
 indirect.mlm.summary(get(model_name))
+
+# percent mediated
+sprintf("percent mediated = %s", round(((12.439 * 0.367) / 5.557) * 100, 2))
 ```
 
 ### narrowcast intentions
@@ -260,6 +266,9 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 }
 
 indirect.mlm.summary(get(model_name))
+
+# percent mediated
+sprintf("percent mediated = %s", round(((12.439 * 0.395) / 6.493) * 100, 2))
 ```
 
 ## social condition {.tabset}
@@ -283,6 +292,9 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 }
 
 indirect.mlm.summary(get(model_name))
+
+# percent mediated
+sprintf("percent mediated = %s", round(((8.904 * 0.446) / 3.351) * 100, 2))
 ```
 
 ### narrowcast intentions
@@ -302,4 +314,7 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 }
 
 indirect.mlm.summary(get(model_name))
+
+# percent mediated
+sprintf("percent mediated = %s", round(((8.904 * 0.564) / 7.581) * 100, 2))
 ```
