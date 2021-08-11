@@ -276,7 +276,7 @@ model %>%
          `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
   select(term, `b [95% CI]`, df, t, p) %>%
   kable()  %>%
-  kable_styling()
+  kableExtra::kable_styling()
 ```
 
 # person-level {.tabset}
@@ -441,5 +441,5 @@ model %>%
          `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
   select(term, `b [95% CI]`, df, t, p) %>%
   kable()  %>%
-  kable_styling()
+  kableExtra::kable_styling()
 ```

@@ -11,7 +11,7 @@
 
 <meta name="author" content="Dani Cosme" />
 
-<meta name="date" content="2021-08-03" />
+<meta name="date" content="2021-08-11" />
 
 <title>Correlational analyses</title>
 
@@ -3172,7 +3172,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Correlational analyses</h1>
 <h4 class="author">Dani Cosme</h4>
-<h4 class="date">2021-08-03</h4>
+<h4 class="date">2021-08-11</h4>
 
 </div>
 
@@ -3225,7 +3225,7 @@ div.tocify {
 <span id="cb1-41"><a href="#cb1-41"></a><span class="st">    </span><span class="kw">select</span>(study, term, <span class="st">`</span><span class="dt">b [95% CI]</span><span class="st">`</span>, df, t, p) <span class="op">%&gt;%</span></span>
 <span id="cb1-42"><a href="#cb1-42"></a><span class="st">    </span><span class="kw">arrange</span>(study) <span class="op">%&gt;%</span></span>
 <span id="cb1-43"><a href="#cb1-43"></a><span class="st">    </span><span class="kw">kable</span>()  <span class="op">%&gt;%</span></span>
-<span id="cb1-44"><a href="#cb1-44"></a><span class="st">    </span><span class="kw">kable_styling</span>()</span>
+<span id="cb1-44"><a href="#cb1-44"></a><span class="st">    </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>()</span>
 <span id="cb1-45"><a href="#cb1-45"></a>}</span></code></pre></div>
 </div>
 <div id="prep-data" class="section level1 tabset">
@@ -3248,11 +3248,18 @@ div.tocify {
 <span id="cb2-13"><a href="#cb2-13"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(ggpubr)) {</span>
 <span id="cb2-14"><a href="#cb2-14"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;ggpubr&#39;</span>)</span>
 <span id="cb2-15"><a href="#cb2-15"></a>}</span>
-<span id="cb2-16"><a href="#cb2-16"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(report)) {</span>
-<span id="cb2-17"><a href="#cb2-17"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;report&#39;</span>)</span>
+<span id="cb2-16"><a href="#cb2-16"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(broom.mixed)) {</span>
+<span id="cb2-17"><a href="#cb2-17"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;broom.mixed&#39;</span>)</span>
 <span id="cb2-18"><a href="#cb2-18"></a>}</span>
-<span id="cb2-19"><a href="#cb2-19"></a>report<span class="op">::</span><span class="kw">cite_packages</span>()</span></code></pre></div>
+<span id="cb2-19"><a href="#cb2-19"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(rmcorr)) {</span>
+<span id="cb2-20"><a href="#cb2-20"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;rmcorr&#39;</span>)</span>
+<span id="cb2-21"><a href="#cb2-21"></a>}</span>
+<span id="cb2-22"><a href="#cb2-22"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(report)) {</span>
+<span id="cb2-23"><a href="#cb2-23"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;report&#39;</span>)</span>
+<span id="cb2-24"><a href="#cb2-24"></a>}</span>
+<span id="cb2-25"><a href="#cb2-25"></a>report<span class="op">::</span><span class="kw">cite_packages</span>()</span></code></pre></div>
 <pre><code>##   - Alboukadel Kassambara (2020). ggpubr: &#39;ggplot2&#39; Based Publication Ready Plots. R package version 0.4.0. https://CRAN.R-project.org/package=ggpubr
+##   - Ben Bolker and David Robinson (2020). broom.mixed: Tidying Methods for Mixed Models. R package version 0.2.6. https://CRAN.R-project.org/package=broom.mixed
 ##   - Douglas Bates and Martin Maechler (2019). Matrix: Sparse and Dense Matrix Classes and Methods. R package version 1.2-18. https://CRAN.R-project.org/package=Matrix
 ##   - Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1-48. doi:10.18637/jss.v067.i01.
 ##   - H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
@@ -3262,6 +3269,7 @@ div.tocify {
 ##   - Hadley Wickham and Jim Hester (2020). readr: Read Rectangular Text Data. R package version 1.4.0. https://CRAN.R-project.org/package=readr
 ##   - Hadley Wickham, Romain François, Lionel Henry and Kirill Müller (2021). dplyr: A Grammar of Data Manipulation. R package version 1.0.7. https://CRAN.R-project.org/package=dplyr
 ##   - Hao Zhu (2020). kableExtra: Construct Complex Table with &#39;kable&#39; and Pipe Syntax. R package version 1.3.1. https://CRAN.R-project.org/package=kableExtra
+##   - Jonathan Z. Bakdash and Laura R. Marusich (2020). rmcorr: Repeated Measures Correlation. R package version 0.4.1. https://CRAN.R-project.org/package=rmcorr
 ##   - Kirill Müller and Hadley Wickham (2021). tibble: Simple Data Frames. R package version 3.1.2. https://CRAN.R-project.org/package=tibble
 ##   - Kuznetsova A, Brockhoff PB, Christensen RHB (2017). &quot;lmerTest Package:Tests in Linear Mixed Effects Models.&quot; _Journal of StatisticalSoftware_, *82*(13), 1-26. doi: 10.18637/jss.v082.i13 (URL:https://doi.org/10.18637/jss.v082.i13).
 ##   - Lionel Henry and Hadley Wickham (2020). purrr: Functional Programming Tools. R package version 0.3.4. https://CRAN.R-project.org/package=purrr
@@ -3883,7 +3891,7 @@ div.tocify {
 <span id="cb15-20"><a href="#cb15-20"></a>         <span class="st">`</span><span class="dt">b [95% CI]</span><span class="st">`</span> =<span class="st"> </span><span class="kw">sprintf</span>(<span class="st">&quot;%.2f [%0.2f, %.2f]&quot;</span>, estimate, conf.low, conf.high)) <span class="op">%&gt;%</span></span>
 <span id="cb15-21"><a href="#cb15-21"></a><span class="st">  </span><span class="kw">select</span>(term, <span class="st">`</span><span class="dt">b [95% CI]</span><span class="st">`</span>, df, t, p) <span class="op">%&gt;%</span></span>
 <span id="cb15-22"><a href="#cb15-22"></a><span class="st">  </span><span class="kw">kable</span>()  <span class="op">%&gt;%</span></span>
-<span id="cb15-23"><a href="#cb15-23"></a><span class="st">  </span><span class="kw">kable_styling</span>()</span></code></pre></div>
+<span id="cb15-23"><a href="#cb15-23"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>()</span></code></pre></div>
 <table class="table" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>

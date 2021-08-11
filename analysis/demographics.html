@@ -11,7 +11,7 @@
 
 <meta name="author" content="Dani Cosme" />
 
-<meta name="date" content="2021-07-07" />
+<meta name="date" content="2021-08-11" />
 
 <title>Demographics</title>
 
@@ -3172,7 +3172,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Demographics</h1>
 <h4 class="author">Dani Cosme</h4>
-<h4 class="date">2021-07-07</h4>
+<h4 class="date">2021-08-11</h4>
 
 </div>
 
@@ -3189,7 +3189,10 @@ div.tocify {
 <span id="cb1-3"><a href="#cb1-3"></a>}</span>
 <span id="cb1-4"><a href="#cb1-4"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(kableExtra)) {</span>
 <span id="cb1-5"><a href="#cb1-5"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;kableExtra&#39;</span>)</span>
-<span id="cb1-6"><a href="#cb1-6"></a>}</span></code></pre></div>
+<span id="cb1-6"><a href="#cb1-6"></a>}</span>
+<span id="cb1-7"><a href="#cb1-7"></a><span class="cf">if</span> (<span class="op">!</span><span class="kw">require</span>(usmap)) {</span>
+<span id="cb1-8"><a href="#cb1-8"></a>  <span class="kw">install.packages</span>(<span class="st">&#39;usmap&#39;</span>)</span>
+<span id="cb1-9"><a href="#cb1-9"></a>}</span></code></pre></div>
 </div>
 <div id="define-aesthetics" class="section level2">
 <h2>define aesthetics</h2>
@@ -3309,7 +3312,7 @@ div.tocify {
 <span id="cb8-6"><a href="#cb8-6"></a>            <span class="st">`</span><span class="dt">mean age</span><span class="st">`</span> =<span class="st"> </span><span class="kw">mean</span>(value, <span class="dt">na.rm =</span> <span class="ot">TRUE</span>),</span>
 <span id="cb8-7"><a href="#cb8-7"></a>            <span class="st">`</span><span class="dt">sd age</span><span class="st">`</span> =<span class="st"> </span><span class="kw">sd</span>(value, <span class="dt">na.rm =</span> <span class="ot">TRUE</span>)) <span class="op">%&gt;%</span></span>
 <span id="cb8-8"><a href="#cb8-8"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb8-9"><a href="#cb8-9"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb8-9"><a href="#cb8-9"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -3410,7 +3413,7 @@ study 6
 <span id="cb9-5"><a href="#cb9-5"></a>            <span class="st">`</span><span class="dt">mean age</span><span class="st">`</span> =<span class="st"> </span><span class="kw">mean</span>(value, <span class="dt">na.rm =</span> <span class="ot">TRUE</span>),</span>
 <span id="cb9-6"><a href="#cb9-6"></a>            <span class="st">`</span><span class="dt">sd age</span><span class="st">`</span> =<span class="st"> </span><span class="kw">sd</span>(value, <span class="dt">na.rm =</span> <span class="ot">TRUE</span>)) <span class="op">%&gt;%</span></span>
 <span id="cb9-7"><a href="#cb9-7"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb9-8"><a href="#cb9-8"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb9-8"><a href="#cb9-8"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -3454,7 +3457,7 @@ sd age
 <span id="cb10-10"><a href="#cb10-10"></a>                                 <span class="st">&quot;Fourth year&quot;</span>, <span class="st">&quot;Fifth year or higher&quot;</span>))) <span class="op">%&gt;%</span></span>
 <span id="cb10-11"><a href="#cb10-11"></a><span class="st">  </span><span class="kw">arrange</span>(value) <span class="op">%&gt;%</span></span>
 <span id="cb10-12"><a href="#cb10-12"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb10-13"><a href="#cb10-13"></a><span class="st">    </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb10-13"><a href="#cb10-13"></a><span class="st">    </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -3525,7 +3528,7 @@ Fifth year or higher
 <span id="cb11-8"><a href="#cb11-8"></a><span class="st">  </span><span class="kw">spread</span>(study, percent) <span class="op">%&gt;%</span></span>
 <span id="cb11-9"><a href="#cb11-9"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb11-10"><a href="#cb11-10"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb11-11"><a href="#cb11-11"></a><span class="st">    </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb11-11"><a href="#cb11-11"></a><span class="st">    </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -3706,7 +3709,7 @@ Woman
 <span id="cb12-8"><a href="#cb12-8"></a><span class="st">  </span><span class="kw">select</span>(<span class="op">-</span>n, <span class="op">-</span>total) <span class="op">%&gt;%</span></span>
 <span id="cb12-9"><a href="#cb12-9"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb12-10"><a href="#cb12-10"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb12-11"><a href="#cb12-11"></a><span class="st">    </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb12-11"><a href="#cb12-11"></a><span class="st">    </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -3800,7 +3803,7 @@ Woman
 <span id="cb13-23"><a href="#cb13-23"></a><span class="st">  </span><span class="kw">spread</span>(study, percent) <span class="op">%&gt;%</span></span>
 <span id="cb13-24"><a href="#cb13-24"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb13-25"><a href="#cb13-25"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb13-26"><a href="#cb13-26"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb13-26"><a href="#cb13-26"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -4057,7 +4060,7 @@ White
 <span id="cb14-25"><a href="#cb14-25"></a><span class="st">  </span><span class="kw">arrange</span>(<span class="st">`</span><span class="dt">race / ethnicity</span><span class="st">`</span>) <span class="op">%&gt;%</span></span>
 <span id="cb14-26"><a href="#cb14-26"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb14-27"><a href="#cb14-27"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb14-28"><a href="#cb14-28"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb14-28"><a href="#cb14-28"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -4173,7 +4176,7 @@ White
 <span id="cb15-13"><a href="#cb15-13"></a><span class="st">  </span><span class="kw">spread</span>(study, percent) <span class="op">%&gt;%</span></span>
 <span id="cb15-14"><a href="#cb15-14"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb15-15"><a href="#cb15-15"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb15-16"><a href="#cb15-16"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb15-16"><a href="#cb15-16"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -4338,7 +4341,7 @@ Doctorate degree (PhD, EdD, etc)
 <span id="cb16-13"><a href="#cb16-13"></a><span class="st">  </span><span class="kw">rename</span>(<span class="st">&quot;highest degree completed&quot;</span> =<span class="st"> </span>value) <span class="op">%&gt;%</span></span>
 <span id="cb16-14"><a href="#cb16-14"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb16-15"><a href="#cb16-15"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb16-16"><a href="#cb16-16"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb16-16"><a href="#cb16-16"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -4446,7 +4449,7 @@ Doctorate degree (PhD, EdD, etc)
 <span id="cb17-13"><a href="#cb17-13"></a><span class="st">  </span><span class="kw">spread</span>(study, percent) <span class="op">%&gt;%</span></span>
 <span id="cb17-14"><a href="#cb17-14"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb17-15"><a href="#cb17-15"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb17-16"><a href="#cb17-16"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb17-16"><a href="#cb17-16"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>
@@ -4625,7 +4628,7 @@ Not reported
 <span id="cb18-13"><a href="#cb18-13"></a><span class="st">  </span><span class="kw">rename</span>(<span class="st">&quot;household income&quot;</span> =<span class="st"> </span>value) <span class="op">%&gt;%</span></span>
 <span id="cb18-14"><a href="#cb18-14"></a><span class="st">  </span><span class="kw">mutate_if</span>(is.character, <span class="kw">funs</span>(<span class="kw">ifelse</span>(<span class="kw">is.na</span>(.), <span class="st">&quot;—&quot;</span>, .))) <span class="op">%&gt;%</span></span>
 <span id="cb18-15"><a href="#cb18-15"></a><span class="st">  </span><span class="kw">kable</span>(<span class="dt">digits =</span> <span class="dv">1</span>) <span class="op">%&gt;%</span></span>
-<span id="cb18-16"><a href="#cb18-16"></a><span class="st">  </span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
+<span id="cb18-16"><a href="#cb18-16"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>(<span class="dt">bootstrap_options =</span> <span class="st">&quot;striped&quot;</span>, <span class="dt">full_width =</span> F, <span class="dt">position =</span> <span class="st">&quot;left&quot;</span>)</span></code></pre></div>
 <table class="table table-striped" style="width: auto !important; ">
 <thead>
 <tr>

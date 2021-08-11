@@ -11,7 +11,7 @@
 
 <meta name="author" content="The Communication Neuroscience Lab at Penn" />
 
-<meta name="date" content="2021-08-03" />
+<meta name="date" content="2021-08-11" />
 
 <title>Causal analyses</title>
 
@@ -3172,7 +3172,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Causal analyses</h1>
 <h4 class="author"><a href="https://cn.asc.upenn.edu/">The Communication Neuroscience Lab at Penn</a></h4>
-<h4 class="date">2021-08-03</h4>
+<h4 class="date">2021-08-11</h4>
 
 </div>
 
@@ -3203,7 +3203,7 @@ div.tocify {
 <span id="cb1-19"><a href="#cb1-19"></a>         <span class="st">`</span><span class="dt">b [95% CI]</span><span class="st">`</span> =<span class="st"> </span><span class="kw">sprintf</span>(<span class="st">&quot;%.2f [%0.2f, %.2f]&quot;</span>, estimate, conf.low, conf.high)) <span class="op">%&gt;%</span></span>
 <span id="cb1-20"><a href="#cb1-20"></a><span class="st">  </span><span class="kw">select</span>(term, <span class="st">`</span><span class="dt">b [95% CI]</span><span class="st">`</span>, df, t, p) <span class="op">%&gt;%</span></span>
 <span id="cb1-21"><a href="#cb1-21"></a><span class="st">  </span><span class="kw">kable</span>()  <span class="op">%&gt;%</span></span>
-<span id="cb1-22"><a href="#cb1-22"></a><span class="st">  </span><span class="kw">kable_styling</span>()</span>
+<span id="cb1-22"><a href="#cb1-22"></a><span class="st">  </span>kableExtra<span class="op">::</span><span class="kw">kable_styling</span>()</span>
 <span id="cb1-23"><a href="#cb1-23"></a>}</span></code></pre></div>
 </div>
 <div id="prep-data" class="section level1 tabset">
@@ -3263,8 +3263,7 @@ div.tocify {
 </div>
 <div id="load-data" class="section level2">
 <h2>load data</h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1"></a>study6 =<span class="st"> </span><span class="kw">read.csv</span>(<span class="st">&quot;../data/study6.csv&quot;</span>, <span class="dt">stringsAsFactors =</span> <span class="ot">FALSE</span>) <span class="co">#%&gt;%</span></span>
-<span id="cb5-2"><a href="#cb5-2"></a>  <span class="co">#mutate(sharing_type = ifelse(sharing_type == 0, -.5, .5))</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1"></a>study6 =<span class="st"> </span><span class="kw">read.csv</span>(<span class="st">&quot;../data/study6.csv&quot;</span>, <span class="dt">stringsAsFactors =</span> <span class="ot">FALSE</span>)</span></code></pre></div>
 </div>
 </div>
 <div id="manipulation-checks" class="section level1 tabset">

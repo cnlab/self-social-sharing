@@ -36,6 +36,9 @@ if (!require(tidyverse)) {
 if (!require(kableExtra)) {
   install.packages('kableExtra')
 }
+if (!require(usmap)) {
+  install.packages('usmap')
+}
 ```
 
 ## define aesthetics
@@ -152,7 +155,7 @@ merged %>%
             `mean age` = mean(value, na.rm = TRUE),
             `sd age` = sd(value, na.rm = TRUE)) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 ## combined
@@ -164,7 +167,7 @@ merged %>%
             `mean age` = mean(value, na.rm = TRUE),
             `sd age` = sd(value, na.rm = TRUE)) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 ## student year
@@ -181,7 +184,7 @@ demo %>%
                                  "Fourth year", "Fifth year or higher"))) %>%
   arrange(value) %>%
   kable(digits = 1) %>%
-    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+    kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 # gender {.tabset}
@@ -197,7 +200,7 @@ demo %>%
   spread(study, percent) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+    kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 ## combined
@@ -212,7 +215,7 @@ demo %>%
   select(-n, -total) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+    kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 # race and ethnicity {.tabset}
@@ -243,7 +246,7 @@ demo %>%
   spread(study, percent) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 ## combined
@@ -275,7 +278,7 @@ demo %>%
   arrange(`race / ethnicity`) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 # education {.tabset}
@@ -296,7 +299,7 @@ demo %>%
   spread(study, percent) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 ## combined
@@ -316,7 +319,7 @@ demo %>%
   rename("highest degree completed" = value) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 # SES {.tabset}
@@ -337,7 +340,7 @@ demo %>%
   spread(study, percent) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
 ## combined
@@ -357,5 +360,5 @@ demo %>%
   rename("household income" = value) %>%
   mutate_if(is.character, funs(ifelse(is.na(.), "—", .))) %>%
   kable(digits = 1) %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+  kableExtra::kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```

@@ -50,7 +50,7 @@ table_model = function(model_data) {
          `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
   select(term, `b [95% CI]`, df, t, p) %>%
   kable()  %>%
-  kable_styling()
+  kableExtra::kable_styling()
 }
 ```
 
@@ -96,8 +96,7 @@ plot_aes = theme_minimal() +
 
 ## load data
 ```{r}
-study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE) #%>%
-  #mutate(sharing_type = ifelse(sharing_type == 0, -.5, .5))
+study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE)
 ```
 
 # manipulation checks {.tabset}

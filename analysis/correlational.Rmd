@@ -72,7 +72,7 @@ table_model = function(model_data) {
     select(study, term, `b [95% CI]`, df, t, p) %>%
     arrange(study) %>%
     kable()  %>%
-    kable_styling()
+    kableExtra::kable_styling()
 }
 ```
 
@@ -95,6 +95,12 @@ if (!require(lmerTest)) {
 }
 if (!require(ggpubr)) {
   install.packages('ggpubr')
+}
+if (!require(broom.mixed)) {
+  install.packages('broom.mixed')
+}
+if (!require(rmcorr)) {
+  install.packages('rmcorr')
 }
 if (!require(report)) {
   install.packages('report')
@@ -353,7 +359,7 @@ model_compare %>%
          `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
   select(term, `b [95% CI]`, df, t, p) %>%
   kable()  %>%
-  kable_styling()
+  kableExtra::kable_styling()
 ```
 
 # supplementary material analyses

@@ -47,6 +47,9 @@ if (!require(furrr)) {
 if (!require(ggpubr)) {
   install.packages('ggpubr')
 }
+if (!require(combinat)) {
+  install.packages('combinat')
+}
 devtools::install_github("dcosme/specr", ref = "plotmods")
 if (!require(report)) {
   install.packages('report')
