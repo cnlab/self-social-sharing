@@ -27,6 +27,8 @@ Correlational and causal evidence from six studies]()
 
 This code summarizes demographic information across studies and for each study separately. 
 
+Individual demographic data is not shared publicly due to concerns related to potential identifiability of participants, but is available upon request. 
+
 # prep data {.tabset}
 ## load packages
 ```{r}
