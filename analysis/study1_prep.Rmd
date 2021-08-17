@@ -57,7 +57,9 @@ data_raw = read.csv("../data/study1a_clean_long.csv",
               mutate(study = "humor")) %>%
   mutate(condition = ifelse(condition == "fact-based", "control",
                      ifelse(condition == "encouraging", "non-mocking", condition)),
-         group = ifelse(is.na(group), condition, group)) %>% 
+         group = ifelse(is.na(group), condition, group),
+         group = ifelse(group == "message control", "control", 
+                 ifelse(group == "encouraging", "non-mocking", group))) %>% 
   mutate(SID = sprintf("%s_%s", study, SID)) %>%
   filter(!group == "no message control") %>%
   select(-condition) %>%
