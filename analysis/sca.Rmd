@@ -358,7 +358,8 @@ output = bind_rows(output) %>%
                                    subsets == "content = climate & sharing_type = broadcast & medium = newspaper" ~ "8",
                                    subsets == "content = covid & sharing_type = narrowcast & medium = newspaper" ~ "3",
                                    subsets == "content = health & sharing_type = narrowcast & medium = newspaper" ~ "7",
-                                   subsets == "content = climate & sharing_type = narrowcast & medium = newspaper" ~ "9"))
+                                   subsets == "content = climate & sharing_type = narrowcast & medium = newspaper" ~ "9"),
+         subset = as.numeric(subset))
 ```
 
 # plot SCA {.tabset}
@@ -421,6 +422,7 @@ plot_choices <- function(df,
                          alpha_values = c(1, 1),
                          color_vars = NULL,
                          palette = NULL,
+                         reorder_var = NULL,
                          rename_controls = FALSE,
                          ignore_vars = FALSE,
                          collapse_content = FALSE) {
@@ -449,6 +451,7 @@ plot_choices <- function(df,
       unique() %>%
       arrange(get(color_vars)) %>%
       mutate(color_num = row_number())
+    
 
     data_df = df %>%
       left_join(., color_num_key) %>%
@@ -475,27 +478,58 @@ plot_choices <- function(df,
       mutate(key = factor(key, levels=unique(key)))
   }
 
-  data_df %>%
-    ggplot(aes(x = .data$specifications,
-               y = .data$value,
-               color = .data$color)) +
-    geom_point(aes(x = .data$specifications,
-                   y = .data$value,
-                   alpha = alpha),
-               shape = 124,
-               size = size) +
-    scale_color_identity() +
-    scale_alpha_manual(values = alpha_values) +
-    theme_minimal() +
-    facet_grid(.data$key~1, scales = "free_y", space = "free_y") +
-    theme(
-      axis.line = element_line("black", size = .5),
-      legend.position = "none",
-      panel.spacing = unit(.75, "lines"),
-      axis.text = element_text(colour = "black"),
-      strip.text.x = element_blank()) +
-    labs(x = "", y = "")
-
+  if (!is.null(reorder_var)) {
+        
+    order = data_df %>%
+      select(key, value) %>%
+      filter(key == !!reorder_var) %>%
+      unique() %>%
+      mutate(order = as.numeric(value))
+    
+    data_df %>%
+      left_join(., order) %>%
+      ggplot(aes(x = .data$specifications,
+                 y = .data$value,
+                 color = .data$color)) +
+      geom_point(aes(x = .data$specifications,
+                     y = reorder(.data$value, order),
+                     alpha = alpha),
+                 shape = 124,
+                 size = size) +
+      scale_color_identity() +
+      scale_alpha_manual(values = alpha_values) +
+      theme_minimal() +
+      facet_grid(.data$key~1, scales = "free_y", space = "free_y") +
+      theme(
+        axis.line = element_line("black", size = .5),
+        legend.position = "none",
+        panel.spacing = unit(.75, "lines"),
+        axis.text = element_text(colour = "black"),
+        strip.text.x = element_blank()) +
+      labs(x = "", y = "")
+    
+  } else {
+    data_df %>%
+      ggplot(aes(x = .data$specifications,
+                 y = .data$value,
+                 color = .data$color)) +
+      geom_point(aes(x = .data$specifications,
+                     y = .data$value,
+                     alpha = alpha),
+                 shape = 124,
+                 size = size) +
+      scale_color_identity() +
+      scale_alpha_manual(values = alpha_values) +
+      theme_minimal() +
+      facet_grid(.data$key~1, scales = "free_y", space = "free_y") +
+      theme(
+        axis.line = element_line("black", size = .5),
+        legend.position = "none",
+        panel.spacing = unit(.75, "lines"),
+        axis.text = element_text(colour = "black"),
+        strip.text.x = element_blank()) +
+      labs(x = "", y = "")
+  }
 }
 ```
 
@@ -512,7 +546,7 @@ plot_sca = function(data, combined = TRUE, labels = c("A", "B"),
                     choices  = c("x", "content", "medium", "sharing", "controls"),
                     alpha_values = c(0.5, 1),
                     remove_y = FALSE, remove_facet = FALSE,
-                    collapse_content = FALSE) {
+                    collapse_content = FALSE, reorder_var = NULL) {
   
   medians = data %>%
     group_by(get(color_vars)) %>%
@@ -554,13 +588,15 @@ plot_sca = function(data, combined = TRUE, labels = c("A", "B"),
       if (!is.null(color_vars)) {
         p2 = plot_choices(data, choices = choices,
                           alpha_values = alpha_values, color_vars = color_vars,
-                          palette = palette, collapse_content = collapse_content) +
+                          palette = palette, collapse_content = collapse_content,
+                          reorder_var = reorder_var) +
           labs(x = "\nspecifications (ranked)")  +
           theme(strip.text.x = element_blank(),
                 text = element_text(size = text_size, family = "Futura Medium"))
       } else {
         p2 = plot_choices(data, choices = choices,
-                          alpha_values = alpha_values, collapse_content = collapse_content) +
+                          alpha_values = alpha_values, collapse_content = collapse_content,
+                          reorder_var = reorder_var) +
           labs(x = "\nspecifications (ranked)")  +
           theme(strip.text.x = element_blank(),
                 text = element_text(size = text_size, family = "Futura Medium"))
@@ -587,7 +623,8 @@ plot_sca = function(data, combined = TRUE, labels = c("A", "B"),
       }
       
       p2 = plot_choices(data, choices = choices,
-                               alpha_values = alpha_values, collapse_content = collapse_content) +
+                        alpha_values = alpha_values, collapse_content = collapse_content,
+                        reorder_var = reorder_var) +
         labs(x = "\nspecification number (ranked)") +
         theme(strip.text.x = element_blank(),
               text = element_text(size = text_size, family = "Futura Medium"))
@@ -820,14 +857,14 @@ self_between_subset = plot_sca(data = filter(output, grepl("self between", x)), 
          color_vars = "medium", palette = palette_medium,
          remove_facet = TRUE, labels = c("", ""), median_size = .75,
          choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-.3, 1),
-         collapse_content = TRUE)
+         collapse_content = TRUE, reorder_var = "subset")
 
 social_between_subset= plot_sca(data = filter(output, grepl("social between", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(.5, 1), text_size = 18,
          color_vars = "medium", palette = palette_medium,
          remove_y = TRUE, labels = c("", ""), median_size = .75,
          choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-.3, 1),
-         collapse_content = TRUE)
+         collapse_content = TRUE, reorder_var = "subset")
 
 ggarrange(self_between_subset, social_between_subset, ncol = 2, labels = c("A", "B"), widths = c(.51, .49))
 ```
@@ -841,14 +878,14 @@ self_within_subset = plot_sca(data = filter(output, grepl("self within", x)), co
          color_vars = "sharing", palette = palette_sharing,
          remove_facet = TRUE, labels = c("", ""), median_size = .75,
          choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-0, .4),
-         collapse_content = TRUE)
+         collapse_content = TRUE, reorder_var = "subset")
 
 social_within_subset = plot_sca(data = filter(output, grepl("social within", x)), combined = TRUE, title = TRUE,
          ci_alpha = 1, alpha_values = c(1, 1), text_size = 18,
          color_vars = "sharing", palette = palette_sharing,
          remove_y = TRUE, labels = c("", ""), median_size = .75,
          choices = c("content", "medium", "sharing", "controls", "subset"), limits = c(-0, .4),
-         collapse_content = TRUE)
+         collapse_content = TRUE, reorder_var = "subset")
 
 ggarrange(self_within_subset, social_within_subset, ncol = 2, labels = c("A", "B"), widths = c(.51, .49))
 ```
