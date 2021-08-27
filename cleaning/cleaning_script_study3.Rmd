@@ -149,5 +149,8 @@ surveys %>%
 
 # write csvs
 ```{r}
-write.csv(surveys, "../data/study3_clean_long.csv", row.names = FALSE)
+write.csv(filter(surveys, !grepl("gender|race$|hispanic_latinx|student_grade", item)),
+          "../data/study3_clean_long.csv", row.names = FALSE)
+write.csv(filter(surveys, grepl("gender|race$|hispanic_latinx|student_grade", item)),
+          "../data/study3_clean_long_demo.csv", row.names = FALSE)
 ```

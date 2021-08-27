@@ -113,7 +113,17 @@ data_mod_diss = messages %>%
 
 # tidy demographic data
 ```{r}
-demo = data_raw %>%
+demo = read.csv("../data/study1a_clean_long_demo.csv",
+                    stringsAsFactors = FALSE) %>%
+  bind_rows(read.csv("../data/study1b_clean_long_demo.csv",
+                     stringsAsFactors = FALSE)) %>%
+  bind_rows(read.csv("../data/study1c_clean_long_demo.csv",
+                     stringsAsFactors = FALSE)) %>%
+  bind_rows(read.csv("../data/study1d_clean_long_demo.csv",
+                     stringsAsFactors = FALSE) %>%
+              mutate(study = "humor")) %>%
+  mutate(SID = sprintf("%s_%s", study, SID)) %>%
+  rename("scale_name" = survey_name) %>%
   filter(grepl("gender|race|hispanic_latino|ses_degree|income_household|^age$|state", item)) %>%
   ungroup() %>%
   select(SID, item, value) %>%

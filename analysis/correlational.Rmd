@@ -21,8 +21,7 @@ options(scipen = 999)
 
 This document provides the code for the analyses reported in:
 
-[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
-Correlational and causal evidence from six studies]()
+[Cosme et al. (Preprint) Message self and social relevance increases intentions to share content: Correlational and causal evidence from six studies](https://psyarxiv.com/9cxfj/)
 
 
 In these analyses, we test correlational associations between self and social relevance and broad- and narrowcast sharing intentions.
@@ -173,7 +172,7 @@ merged %>%
   kable(format = "pandoc")
 ```
 
-### means, SDs, and corrlations
+### means, SDs, and correlations
 Correlations are generated using repeated measures correlations to account for observations nested within participant.
 
 ```{r, cache = TRUE}

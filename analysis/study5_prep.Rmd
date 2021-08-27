@@ -114,7 +114,7 @@ data_mod_diss = messages %>%
 
 # tidy demographic data
 ```{r}
-demo = data_raw %>%
+demo = read.csv("../data/study5_clean_long_demo.csv", stringsAsFactors = FALSE) %>%
   filter(grepl("gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)) %>%
   ungroup() %>%
   select(SID, item, value) %>%

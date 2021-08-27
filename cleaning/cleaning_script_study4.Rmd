@@ -130,5 +130,8 @@ surveys_tidy = surveys_include %>%
 
 # write csvs
 ```{r}
-write.csv(surveys_tidy, "../data/study4_clean_long.csv", row.names = FALSE)
+write.csv(select(surveys_tidy, -age, -gender),
+          "../data/study4_clean_long.csv", row.names = FALSE)
+write.csv(select(surveys_tidy, ResponseId, age, gender),
+          "../data/study4_clean_long_demo.csv", row.names = FALSE)
 ```

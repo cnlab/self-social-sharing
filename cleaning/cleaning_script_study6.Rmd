@@ -290,41 +290,10 @@ surveys_clean %>%
   DT::datatable(filter = "top", rownames = FALSE)
 ```
 
-# output file for response checking
-```{r}
-# article info
-articles = read.csv("../../bbprime-behavioral/causal_study/articles.csv", stringsAsFactors = FALSE)
-
-# stim order
-stim_order = surveys %>%
-  filter(grepl("stim_order", survey_name)) %>%
-  select(SID, value) %>%
-  mutate(article_number = strsplit(value, "\\|")) %>%
-  unnest(article_number) %>%
-  mutate(article_number = as.numeric(article_number)) %>%
-  select(-value) %>%
-  bind_cols(., data.frame(item = rep(sprintf("%s_comment", 1:10), length(unique(surveys$SID))))) %>%
-  mutate(item = as.character(item)) %>%
-  left_join(., select(articles, article_number, main_headline, snippet)) %>%
-  select(-article_number)
-
-# subset and tidy message data
-review_data = surveys %>%
-  filter(grepl("english|comment", item)) %>%
-  select(-survey_name) %>%
-  left_join(., stim_order) %>%
-  rename("comment" = value) %>%
-  mutate(copied_headline = ifelse(tolower(comment) == tolower(main_headline), 1, 0),
-         failed_both_attention = ifelse(SID %in% removed_attn$SID, 1, 0),
-         failed_english = ifelse(SID %in% failed_english$SID, 1, 0)) %>%
-  left_join(., surveys %>% filter(grepl("ResponseId|MID", item)) %>% select(-survey_name) %>% spread(item, value) %>% select(SID, MID, ResponseId)) %>%
-  arrange(SID) %>%
-  select(SID, ResponseId, everything(), -MID) %>%
-  mutate_if(is.character, ~ ifelse(is.na(.), "", .)) %>%
-  mutate_at(c("copied_headline", "failed_both_attention", "failed_english"), ~ ifelse(is.na(.), "", .))
-```
-
 # write csvs
 ```{r}
-write.csv(surveys_clean, "../data/study6_clean_long.csv", row.names = FALSE)
+write.csv(filter(surveys_clean, !grepl("gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)),
+          "../data/study6_clean_long.csv", row.names = FALSE)
+write.csv(filter(surveys_clean, grepl("gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)),
+          "../data/study6_clean_long_demo.csv", row.names = FALSE)
 ```

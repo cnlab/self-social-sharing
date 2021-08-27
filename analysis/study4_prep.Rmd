@@ -99,7 +99,9 @@ data_mod_diss = data %>%
 
 # tidy demographic data
 ```{r, eval = FALSE}
-demo = data %>%
+demo = read.csv("../data/study4_clean_long_demo.csv", stringsAsFactors = FALSE) %>%
+  left_join(., ids) %>%
+  select(-ResponseId) %>%
   select(SID, age, gender) %>%
   mutate(study = "study 4",
          SID = sprintf("%s_%s", study, SID),
