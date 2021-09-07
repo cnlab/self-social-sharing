@@ -26,7 +26,7 @@ Individual demographic data is not shared publicly due to concerns related to po
 * `analysis` = R code for the analyses reported in the manuscript and supplementary material
 * `cleaning` = R code and supporting files for cleaning the data
 * `data` = text files containing the data
-* `stimuli` = text files containing the newspaper article stimuli from Studies 4-6; stimuli from Studies 1-3 are available on [OSF](https://osf.io/nfr7h/)
+* `stimuli` = text files containing the newspaper article stimuli from Studies 4-6; stimuli from Studies 1-3 are available on [OSF](https://osf.io/nfr7h/?view_only=1e9c4c5b317743ca86af5fc84b0606e1)
 
 ````
 ├── analysis
