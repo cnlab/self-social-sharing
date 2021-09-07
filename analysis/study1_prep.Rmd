@@ -22,11 +22,6 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 options(scipen=999)
 ```
 
-This document provides the code for the analyses reported in:
-
-[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
-Correlational and causal evidence from six studies]()
-
 This script tidies and prepares the cleaned data from Study 1.
 
 # load packages

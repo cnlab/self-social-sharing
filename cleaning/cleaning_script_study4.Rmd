@@ -1,6 +1,6 @@
 ---
 title: "Study 4 data cleaning"
-author: "Dani Cosme"
+author: ""
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -21,11 +21,6 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 options(scipen=999)
 ```
-
-This document provides the code for the analyses reported in:
-
-[Cosme et al. (Preprint) Message self and social relevance is positively related to sharing intentions:
-Correlational and causal evidence from six studies]()
 
 This script cleans the raw data from Study 4.
 

@@ -1,7 +1,7 @@
 # self-social-sharing
 This repository contains code for the analyses reported in the following manuscript:
 
-[**Cosme et al. (Preprint) Message self and social relevance increases intentions to share content: Correlational and causal evidence from six studies**](https://psyarxiv.com/9cxfj/)
+[**Cosme et al. (Preprint) Message self and social relevance increases intentions to share content: Correlational and causal evidence from six studies**]()
 
 
 ## Compiled analysis files

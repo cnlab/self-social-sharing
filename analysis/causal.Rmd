@@ -1,6 +1,6 @@
 ---
 title: "Causal analyses"
-author: "[The Communication Neuroscience Lab at Penn](https://cn.asc.upenn.edu/)"
+author: ""
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -19,10 +19,6 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, dpi = 150)
 options(scipen = 999)
 set.seed(65)
 ```
-
-This document provides the code for the analyses reported in:
-
-[Cosme et al. (Preprint) Message self and social relevance increases intentions to share content: Correlational and causal evidence from six studies](https://psyarxiv.com/9cxfj/)
 
 In these analyses, we test causal relationships between self and social relevance and broad- and narrowcast sharing intentions with data from Study 6.
 
