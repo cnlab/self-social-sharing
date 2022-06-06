@@ -65,7 +65,7 @@ table_model = function(model_data) {
            `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
     select(study, term, `b [95% CI]`, df, t, p) %>%
     arrange(study) %>%
-    kable()  %>%
+    kable() %>%
     kableExtra::kable_styling()
 }
 ```
@@ -75,38 +75,18 @@ First, we load the relevant packages and data, and define the plotting aesthetic
 
 ## load packages
 ```{r}
-if (!require(tidyverse)) {
-  install.packages('tidyverse')
+if(!require('pacman')) {
+	install.packages('pacman')
 }
-if (!require(knitr)) {
-  install.packages('knitr')
-}
-if (!require(kableExtra)) {
-  install.packages('kableExtra')
-}
-if (!require(lmerTest)) {
-  install.packages('lmerTest')
-}
-if (!require(ggpubr)) {
-  install.packages('ggpubr')
-}
-if (!require(broom.mixed)) {
-  install.packages('broom.mixed')
-}
-if (!require(rmcorr)) {
-  install.packages('rmcorr')
-}
-if (!require(report)) {
-  install.packages('report')
-}
+
+pacman::p_load(tidyverse, knitr, kableExtra, lmerTest, ggpubr, broom.mixed, rmcorr, report, EMAtools)
 report::cite_packages()
 ```
 
 ## define aesthetics
 ```{r}
 palette = c("#001219", "#005F73", "#0A9396", "#94D2BD", "#E9D8A6", "#EE9B00", "#CA6702", "#BB3E03", "#AE2012")
-palette_sharing = c("#0a9396", "#EE9B00")
-palette_relevance = c("#bb3e03", "#f14f04", "#005F73", "#0088a3")
+palette_sharing = c("#086E70", "#FFA600")
 
 plot_aes = theme_minimal() +
   theme(legend.position = "top",
@@ -326,11 +306,31 @@ predicted %>%
   guides(linetype = guide_legend(override.aes = list(fill = NA))) +
   labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
   plot_aes  +
-  theme(legend.position = "top")
+  theme(legend.position = "top",
+        legend.key.width=unit(2,"cm"))
 ```
 
 ### model summary table
 ```{r, fig.width=10, fig.height=4.5}
+eff_size = cbind(summary(model_compare)$coefficients[,4],
+                 summary(model_compare)$coefficients[,3]) %>%
+  data.frame() %>%
+  rename("t" = X1,
+         "df" = X2) %>%
+  mutate(d = (2*t) / sqrt(df)) %>%
+  rownames_to_column(var = "term") %>%
+  mutate(term = gsub(":", " x ", term),
+         term = gsub("msg_", "", term),
+         term = gsub("_", " ", term),
+         term = gsub("within", "within", term),
+         term = gsub("between", "between", term),
+         term = gsub("rel self", "Self", term),
+         term = gsub("rel social", "Social", term),
+         term = gsub("sharing type", "Sharing type", term),
+         term = gsub("Sharing type x (.*)", "\\1 x Sharing type", term),
+         d = sprintf("%.2f", d)) %>%
+  select(term, d)
+
 model_compare %>%
   broom.mixed::tidy(conf.int = TRUE) %>%
   filter(effect == "fixed") %>%
@@ -351,7 +351,9 @@ model_compare %>%
          p = ifelse(p < .001, "< .001",
                     ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
          `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
-  select(term, `b [95% CI]`, df, t, p) %>%
+  left_join(., eff_size) %>%
+  mutate(d = ifelse(is.na(d), "--", d)) %>%
+  select(term, `b [95% CI]`, d, df, t, p) %>%
   kable()  %>%
   kableExtra::kable_styling()
 ```
@@ -464,6 +466,19 @@ model_data = model_lmer %>%
 table_model(model_data)
 ```
 
+### model VIF
+```{r}
+model_lmer %>%
+  mutate(vif = map(test, car::vif)) %>%
+  select(-data, -test) %>%
+  unnest(vif) %>%
+  bind_cols(data.frame(variable = rep(c("self between", "self within", "social between", "social within"), 9)))   %>%
+  mutate(vif = round(vif, 2)) %>%
+    reactable::reactable(filterable = TRUE)
+  
+```
+
+
 ## separate and combined plot
 This plot is reported in supplementary material Figure S6.
 
@@ -524,4 +539,129 @@ model_data = model_lmer %>%
 ### model summary table
 ```{r}
 table_model(model_data)
+```
+
+### model VIF
+```{r}
+model_lmer %>%
+  mutate(vif = map(test, car::vif)) %>%
+  select(-data, -test) %>%
+  unnest(vif) %>%
+  bind_cols(data.frame(variable = rep(c("social between", "sharing type", "social within", "self between", "self within", "social between x sharing type", "social within x sharing type", "self between x sharing type", "self within x sharing type"), 3))) %>%
+  mutate(vif = round(vif, 2)) %>%
+    reactable::reactable(filterable = TRUE)
+  
+```
+
+## separate mega-analyses {.tabset}
+### self-relevance
+```{r}
+model_self = lmerTest::lmer(msg_share_std ~ 0 + msg_rel_self_between*sharing_type +
+                                 msg_rel_self_within*sharing_type +
+                                 (1 + msg_rel_self_within | SID) +
+                                 (1 + msg_rel_self_within | item),
+                               data = merged,
+                       control = lmerControl(optimizer = "bobyqa"))
+
+model_self %>%
+  broom.mixed::tidy(conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  rename("SE" = std.error,
+         "t" = statistic,
+         "p" = p.value) %>%
+  select(-group, -effect) %>%
+  mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
+  mutate(term = gsub(":", " x ", term),
+         term = gsub("msg_", "", term),
+         term = gsub("_", " ", term),
+         term = gsub("within", "within", term),
+         term = gsub("between", "between", term),
+         term = gsub("rel self", "Self", term),
+         term = gsub("rel social", "Social", term),
+         term = gsub("sharing type", "Sharing type", term),
+         term = gsub("Sharing type x (.*)", "\\1 x Sharing type", term),
+         p = ifelse(p < .001, "< .001",
+                    ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
+         `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
+  select(term, `b [95% CI]`, df, t, p) %>%
+  kable()  %>%
+  kableExtra::kable_styling()
+```
+
+### social relevance
+```{r}
+model_social = lmerTest::lmer(msg_share_std ~ 0 + msg_rel_social_between*sharing_type +
+                                 msg_rel_social_within*sharing_type +
+                                 (1 + msg_rel_social_within | SID) +
+                                 (1 + msg_rel_social_within | item),
+                               data = merged,
+                       control = lmerControl(optimizer = "bobyqa"))
+
+model_social %>%
+  broom.mixed::tidy(conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  rename("SE" = std.error,
+         "t" = statistic,
+         "p" = p.value) %>%
+  select(-group, -effect) %>%
+  mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
+  mutate(term = gsub(":", " x ", term),
+         term = gsub("msg_", "", term),
+         term = gsub("_", " ", term),
+         term = gsub("within", "within", term),
+         term = gsub("between", "between", term),
+         term = gsub("rel self", "Self", term),
+         term = gsub("rel social", "Social", term),
+         term = gsub("sharing type", "Sharing type", term),
+         term = gsub("Sharing type x (.*)", "\\1 x Sharing type", term),
+         p = ifelse(p < .001, "< .001",
+                    ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
+         `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
+  select(term, `b [95% CI]`, df, t, p) %>%
+  kable()  %>%
+  kableExtra::kable_styling()
+```
+
+### plot
+```{r, fig.width=10, fig.height=6}
+predicted = ggeffects::ggpredict(model_self, c("msg_rel_self_between [-3:3]", "sharing_type")) %>%
+  data.frame() %>%
+  mutate(type = "self_between") %>%
+  bind_rows(ggeffects::ggpredict(model_self, c("msg_rel_self_within [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "self_within")) %>%
+  bind_rows(ggeffects::ggpredict(model_social, c("msg_rel_social_between [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "social_between")) %>%
+  bind_rows(ggeffects::ggpredict(model_social, c("msg_rel_social_within [-3:3]", "sharing_type")) %>%
+              data.frame() %>%
+              mutate(type = "social_within"))
+
+points = merged %>%
+  select(-group) %>%
+  rename("group" = sharing_type,
+         "predicted" = msg_share_std) %>%
+  select(study, SID, group, predicted, contains("within"), contains("between")) %>%
+  gather(type, x, contains("msg")) %>%
+  mutate(type = gsub("msg_rel_", "", type),
+         group = ifelse(group == 0, "broadcast", "narrowcast")) %>%
+  extract(type, c("variable", "type"), "(.*)_(.*)") %>%
+  filter(x < 3 & x > -3)
+
+predicted %>%
+  mutate(group = ifelse(group == 0, "broadcast", "narrowcast")) %>%
+  extract(type, c("variable", "type"), "(.*)_(.*)") %>%
+  ggplot(aes(x, predicted, color = group, fill = group, linetype = type)) +
+  geom_point(data = points, aes(x, predicted), alpha = .02, size = .25) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .2, color = NA) +
+  geom_line(size = 1) +
+  facet_grid(~variable) +
+  scale_color_manual(name = "", values = palette_sharing) +
+  scale_fill_manual(name = "", values = palette_sharing) +
+  scale_linetype_manual(name = "", values = c("solid", "dashed")) +
+  guides(linetype = guide_legend(override.aes = list(fill = NA))) +
+  labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
+  plot_aes  +
+  theme(legend.position = "top",
+        legend.key.width=unit(2,"cm"))
 ```

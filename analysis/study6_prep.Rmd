@@ -30,7 +30,7 @@ if(!require('pacman')) {
 	install.packages('pacman')
 }
 
-pacman::p_load(tidyverse)
+pacman::p_load(tidyverse, tidyText, lmerTest)
 ```
 
 # load and tidy message data
@@ -65,6 +65,13 @@ cond_order = data_raw %>%
   bind_cols(., data.frame(item = rep(1:10, length(unique(data_raw$SID))))) %>%
   mutate(item = as.character(item),
          article_cond = gsub("other", "social", article_cond))
+
+comments = data_raw %>%
+  filter(grepl("comment", survey_name)) %>%
+  extract(item, "item", "([0-9]+)_.*") %>%
+  mutate(cond = gsub("other", "social", cond)) %>%
+  left_join(., stim_order) %>%
+  left_join(., cond_order)
 
 messages = data_raw %>%
   filter(grepl("sharing|relevance_self|relevance_social", survey_name)) %>%
@@ -159,5 +166,6 @@ demo = read.csv("../data/study6_clean_long_demo.csv", stringsAsFactors = FALSE) 
 ```{r}
 write.csv(data_mod_diss, "../data/study6.csv", row.names = FALSE)
 write.csv(demo, "../data/study6_demo.csv", row.names = FALSE)
+write.csv(comments, "../data/study6_comments.csv", row.names = FALSE)
 ```
 

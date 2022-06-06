@@ -25,27 +25,180 @@ In these analyses, we test causal relationships between self and social relevanc
 # define functions
 ```{r}
 # MLM results table function
-table_model = function(model_data) {
-  model_data %>%
-  broom.mixed::tidy(conf.int = TRUE) %>%
-  filter(effect == "fixed") %>%
-  rename("SE" = std.error,
-         "t" = statistic,
-         "p" = p.value) %>%
-  select(-group, -effect) %>%
-  mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
-  mutate(term = gsub("article_cond", "", term),
-         term = gsub("\\(Intercept\\)", "control", term),
-         term = gsub("sharing_type", "sharing type", term),
-         term = gsub("msg_rel_self_between", "self-relevance", term),
-         term = gsub("msg_rel_social_between", "social relevance", term),
-         term = gsub(":", " x ", term),
-         p = ifelse(p < .001, "< .001",
-                    ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
-         `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) %>%
-  select(term, `b [95% CI]`, df, t, p) %>%
-  kable()  %>%
-  kableExtra::kable_styling()
+table_model = function(model_data, eff_size = TRUE) {
+  
+  results = model_data %>%
+    broom.mixed::tidy(conf.int = TRUE) %>%
+    filter(effect == "fixed") %>%
+    rename("SE" = std.error,
+           "t" = statistic,
+           "p" = p.value) %>%
+    select(-group, -effect) %>%
+    mutate_at(vars(-contains("term"), -contains("p.value")), round, 2) %>%
+    mutate(term = gsub("article_cond", "", term),
+           term = gsub("\\(Intercept\\)", "control", term),
+           term = gsub("sharing_type", "sharing type", term),
+           term = gsub("msg_rel_self_between", "self-relevance", term),
+           term = gsub("msg_rel_social_between", "social relevance", term),
+           term = gsub("contentclimate", "content (climate)", term),
+           term = gsub("n_c", "word count", term),
+           term = gsub(":", " x ", term),
+           p = ifelse(p < .001, "< .001",
+                      ifelse(p == 1, "1.000", gsub("0.(.*)", ".\\1", sprintf("%.3f", p)))),
+           `b [95% CI]` = sprintf("%.2f [%0.2f, %.2f]", estimate, conf.low, conf.high)) 
+  
+  if (eff_size == TRUE) {
+    eff_size = lme.dscore(model_data, data = study6, type = "lme4") %>%
+      rownames_to_column(var = "term") %>%
+      mutate(term = gsub("article_cond", "", term),
+             term = gsub("article_cond", "", term),
+             term = gsub("\\(Intercept\\)", "control", term),
+             term = gsub("sharing_type", "sharing type", term),
+             term = gsub("msg_rel_self_between", "self-relevance", term),
+             term = gsub("msg_rel_social_between", "social relevance", term),
+             term = gsub("contentclimate", "content (climate)", term),
+             term = gsub(":", " x ", term),
+             d = sprintf("%.2f", d)) %>%
+      select(term, d)
+    
+    results %>%
+      left_join(., eff_size) %>%
+      mutate(d = ifelse(is.na(d), "--", d)) %>%
+      select(term, `b [95% CI]`, d, df, t, p) %>%
+      kable() %>%
+      kableExtra::kable_styling()
+    
+  } else {
+    results %>%
+      select(term, `b [95% CI]`, df, t, p) %>%
+      kable() %>%
+      kableExtra::kable_styling()
+  }
+}
+
+# Run bayesian mediation model
+run_brm_model = function(model_name, model_formula, y_var, data) {
+  if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
+    assign(get("model_name"), readRDS(sprintf("models/model_%s.RDS", model_name)))
+  } else {
+    
+    assign(get("model_name"),
+           brm(
+             model_formula,
+             data = data,
+             cores = 4,
+             thin = 4,
+             seed = seed,
+             control = list(adapt_delta = .99, max_treedepth = 15)
+        ))
+    
+    saveRDS(eval(parse(text = model_name)), sprintf("models/model_%s.RDS", model_name))
+    return(eval(parse(text = model_name)))
+  }
+}
+
+# Get path estimates from bayesian mediation models
+create_paths = function(model, x_var, y_var) {
+  paths = posterior_samples(model) %>% 
+    mutate(a1 = get(sprintf("b_msgrelself_article_cond%s", x_var)),
+           a2 = get(sprintf("b_msgrelsocial_article_cond%s", x_var)),
+           b1 = get(sprintf("b_%s_msg_rel_self", y_var)),
+           b2 = get(sprintf("b_%s_msg_rel_social", y_var)),
+           c_prime = get(sprintf("b_%s_article_cond%s", y_var, x_var)),
+           a1b1 = a1 * b1,
+           a2b2 = a2 * b2,
+           c = c_prime + a1b1 + a2b2,
+           cor1 = get(sprintf("cor_SID__msgrelself_article_cond%s__%s_msg_rel_self", x_var, y_var)),
+           cor2 = get(sprintf("cor_SID__msgrelsocial_article_cond%s__%s_msg_rel_social", x_var, y_var)),
+           sd_a1 = get(sprintf("sd_SID__msgrelself_article_cond%s", x_var)),
+           sd_b1 = get(sprintf("sd_SID__%s_msg_rel_self", y_var)),
+           sd_a2 = get(sprintf("sd_SID__msgrelsocial_article_cond%s", x_var)),
+           sd_b2 = get(sprintf("sd_SID__%s_msg_rel_social", y_var)),
+           cov_a1b1 = cor1*sd_a1*sd_b1,
+           cov_a2b2 = cor2*sd_a2*sd_b2,
+           a1b1_cov_a1b1 = a1b1 + cov_a1b1,
+           a2b2_cov_a2b2 = a2b2 + cov_a2b2,
+           model = x_var,
+           outcome = y_var)
+  
+  return(paths)
+}
+
+create_paths_words = function(model, x_var, y_var) {
+  y_var = gsub("_", "", y_var)
+  paths = posterior_samples(model) %>% 
+    mutate(a1 = get(sprintf("b_nc_article_cond%s", x_var)),
+           b1 = get(sprintf("b_%s_n_c", y_var)),
+           c_prime = get(sprintf("b_%s_article_cond%s", y_var, x_var)),
+           a1b1 = a1 * b1,
+           c = c_prime + a1b1,
+           cor1 = get(sprintf("cor_SID__nc_article_cond%s__%s_n_c", x_var, y_var)),
+           sd_a1 = get(sprintf("sd_SID__nc_article_cond%s", x_var)),
+           sd_b1 = get(sprintf("sd_SID__%s_n_c", y_var)),
+           cov_a1b1 = cor1*sd_a1*sd_b1,
+           a1b1_cov_a1b1 = a1b1 + cov_a1b1,
+           model = x_var,
+           outcome = y_var)
+  
+  return(paths)
+}
+
+get_paths = function(model, x_var, y_var) {
+  create_paths(model, x_var, y_var) %>% 
+    select(a1:a2b2_cov_a2b2, -contains("sd"), -contains("cor"), -starts_with("cov")) %>% 
+    gather(path, value) %>% 
+    group_by(path) %>% 
+    summarize(median = median(value),
+              `Mdn [95% CI]` = sprintf("%.2f [%.2f, %.2f]", median(value), quantile(value, probs = .025), quantile(value, probs = .975))) %>%
+    mutate(path = factor(path, levels = c("a1", "b1", "a1b1", "a1b1_cov_a1b1", "a2", "b2", "a2b2", "a2b2_cov_a2b2", "c", "c_prime"))) %>%
+    arrange(path) %>%
+    select(-median) %>%
+    kable() %>%
+    kableExtra::kable_styling()
+}
+
+get_paths_words = function(model, x_var, y_var) {
+  create_paths_words(model, x_var, y_var) %>% 
+    select(a1:a1b1_cov_a1b1, -contains("sd"), -contains("cor"), -starts_with("cov")) %>% 
+    gather(path, value) %>% 
+    group_by(path) %>% 
+    summarize(median = median(value),
+              `Mdn [95% CI]` = sprintf("%.2f [%.2f, %.2f]", median(value), quantile(value, probs = .025), quantile(value, probs = .975))) %>%
+    mutate(path = factor(path, levels = c("a1", "b1", "a1b1", "a1b1_cov_a1b1", "c", "c_prime"))) %>%
+    arrange(path) %>%
+    select(-median) %>%
+    kable() %>%
+    kableExtra::kable_styling()
+}
+
+percent_mediated = function(model, x_var, y_var) {
+  create_paths(model, x_var, y_var) %>% 
+    select(a1b1_cov_a1b1, a2b2_cov_a2b2, c) %>% 
+    gather(path, value) %>% 
+    group_by(path) %>% 
+    summarize(median = median(value)) %>%
+    select(path, median) %>%
+    spread(path, median) %>%
+    mutate(self = round((a1b1_cov_a1b1 / c) * 100, 0),
+           social = round((a2b2_cov_a2b2 / c) * 100, 0),
+           total = self + social) %>%
+    select(self, social, total) %>%
+    kable(caption = "percent mediated") %>%
+    kableExtra::kable_styling()
+}
+
+percent_mediated_words = function(model, x_var, y_var) {
+  create_paths_words(model, x_var, y_var) %>% 
+    select(a1b1_cov_a1b1, c) %>% 
+    gather(path, value) %>% 
+    group_by(path) %>% 
+    summarize(median = median(value)) %>%
+    select(path, median) %>%
+    spread(path, median) %>%
+    mutate(word_count = round((a1b1_cov_a1b1 / c) * 100, 0)) %>%
+    select(word_count) %>%
+    kable(caption = "percent mediated") %>%
+    kableExtra::kable_styling()
 }
 ```
 
@@ -54,31 +207,20 @@ First, we load the relevant packages and data, and define the plotting aesthetic
 
 ## load packages
 ```{r}
-if (!require(tidyverse)) {
-  install.packages('tidyverse')
+if(!require('pacman')) {
+	install.packages('pacman')
 }
-if (!require(knitr)) {
-  install.packages('knitr')
-}
-if (!require(kableExtra)) {
-  install.packages('kableExtra')
-}
-if (!require(lmerTest)) {
-  install.packages('lmerTest')
-}
-if (!require(boot)) {
-  install.packages('boot')
-}
-if (!require(report)) {
-  install.packages('report')
-}
+
+pacman::p_load(tidyverse, knitr, kableExtra, lmerTest, boot, report, brms, tidybayes, ggpubr, tidyText, EMAtools, broom.mixed)
 report::cite_packages()
 ```
 
 ## define aesthetics
 ```{r}
 palette_condition = c("#ee9b00", "#bb3e03", "#005f73")
-palette_sharing = c("#0a9396", "#ee9b00")
+palette_sharing = c("#086E70", "#FFA600")
+palette_content = c("#9FC490", "#43BCCD")
+palette_relevance = c("#FB590E", "#00667A")
 
 plot_aes = theme_minimal() +
   theme(legend.position = "top",
@@ -91,7 +233,19 @@ plot_aes = theme_minimal() +
 
 ## load data
 ```{r}
-study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE)
+study6 = read.csv("../data/study6.csv", stringsAsFactors = FALSE) %>%
+  mutate(content = factor(content, levels = c("health", "climate")))
+
+study6_comments = read.csv("../data/study6_comments.csv", stringsAsFactors = FALSE)
+```
+
+# condition ns
+```{r}
+study6 %>%
+  select(group, SID) %>%
+  unique() %>%
+  group_by(group) %>%
+  summarize(n = n())
 ```
 
 # manipulation checks {.tabset}
@@ -146,7 +300,7 @@ table_model(mod_h3_h4)
 # combined plot
 This is the plot in Figure 4.
 
-```{r, fig.width=12, fig.height=5}
+```{r, fig.width=10, fig.height=5}
 # generate predicted values
 predicted_h1 = ggeffects::ggpredict(mod_h1, c("article_cond")) %>%
               data.frame() %>%
@@ -197,7 +351,7 @@ source("indirectMLM.R")
 
 # create self condition dataframe
 data_med_self = study6 %>%
-  filter(!article_cond == "social") %>%
+  filter(group == "self") %>%
   mutate(article_cond = ifelse(article_cond == "self", 1, 0),
          sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast"),
          SID = as.character(SID)) %>%
@@ -208,7 +362,7 @@ data_med_self = study6 %>%
 
 # create social condition dataframe
 data_med_social = study6 %>%
-  filter(!article_cond == "self") %>%
+  filter(group == "social") %>%
   mutate(article_cond = ifelse(article_cond == "social", 1, 0),
          sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast"),
          SID = as.character(SID)) %>%
@@ -240,14 +394,14 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 indirect.mlm.summary(get(model_name))
 
 # percent mediated
-sprintf("percent mediated = %s", round(((12.439 * 0.367) / 5.557) * 100, 2))
+sprintf("percent mediated = %s", round(((12.629 * 0.344) / 5.377) * 100, 0))
 ```
 
 ### narrowcast intentions
 ```{r}
 y_var = "narrowcast"
 m_var = "msg_rel_self"
-model_name = "mediation_selfnarrowcast"
+model_name = "mediation_self_narrowcast"
 data = data_med_self
 
 if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
@@ -262,7 +416,7 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 indirect.mlm.summary(get(model_name))
 
 # percent mediated
-sprintf("percent mediated = %s", round(((12.439 * 0.395) / 6.493) * 100, 2))
+sprintf("percent mediated = %s", round(((12.629 * 0.422) / 6.789) * 100, 0))
 ```
 
 ## social condition {.tabset}
@@ -288,7 +442,7 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 indirect.mlm.summary(get(model_name))
 
 # percent mediated
-sprintf("percent mediated = %s", round(((8.904 * 0.446) / 3.351) * 100, 2))
+sprintf("percent mediated = %s", round(((8.591 * 0.472) / 3.402) * 100, 0))
 ```
 
 ### narrowcast intentions
@@ -310,5 +464,350 @@ if (file.exists(sprintf("models/model_%s.RDS", model_name))) {
 indirect.mlm.summary(get(model_name))
 
 # percent mediated
-sprintf("percent mediated = %s", round(((8.904 * 0.564) / 7.581) * 100, 2))
+sprintf("percent mediated = %s", round(((8.591 * 0.55) / 7.326) * 100, 0))
+```
+
+# post-hoc {.tabset}
+These analyses were added in response to feedback from reviewers during peer review.
+
+## moderation by article content {.tabset}
+Are the relationships moderated by article content types (health or climate)?
+
+### self-relevance {.tabset}
+#### run model
+Note: The model allowing both condition and article content type to vary randomly across people did not converge. We therefore used AIC to select the best fitting random effects structure and summarize results from this model
+
+```{r}
+mod_h1_1 = lmer(msg_rel_self ~ 1 + article_cond * content + (1 + article_cond | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+mod_h1_2 = lmer(msg_rel_self ~ 1 + article_cond * content + (1 + content | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+anova(mod_h1_1, mod_h1_2)
+summary(mod_h1_2)
+```
+
+#### model summary table
+```{r}
+table_model(mod_h1_2)
+```
+
+### social relevance {.tabset}
+#### run model
+```{r}
+mod_h2 = lmer(msg_rel_social ~ 1 + article_cond * content + (1 + article_cond + content | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+summary(mod_h2)
+```
+
+#### model summary table
+```{r}
+table_model(mod_h2)
+```
+
+### sharing {.tabset}
+#### run model
+```{r}
+mod_h3_h4 = lmer(msg_share ~ 1 + article_cond*sharing_type*content + (1 + sharing_type + content | SID),
+              data = study6,
+              control = lmerControl(optimizer = "bobyqa"))
+summary(mod_h3_h4)
+```
+
+#### model summary table
+```{r}
+table_model(mod_h3_h4)
+```
+
+### plot
+```{r, fig.width=12, fig.height=5}
+# generate predicted values
+predicted_h1 = ggeffects::ggpredict(mod_h1_2, c("article_cond", "content")) %>%
+              data.frame() %>%
+  mutate(model = "self\nrelevance")
+
+predicted_h2 = ggeffects::ggpredict(mod_h2, c("article_cond", "content")) %>%
+              data.frame() %>%
+  mutate(model = "social\nrelevance")
+
+predicted_h3_h4 = ggeffects::ggpredict(mod_h3_h4, c("article_cond", "sharing_type", "content")) %>%
+              data.frame() %>%
+  mutate(group = ifelse(group == "0", "broadcast sharing", "narrowcast sharing"))
+
+# manipulation check plot
+check = bind_rows(predicted_h1, predicted_h2) %>%
+  ggplot(aes(x = x, y = predicted, color = group)) +
+  stat_summary(aes(group = group), fun.y = "mean", geom = "line", position = position_dodge(.2), size = 1) + 
+  geom_pointrange(aes( ymin = conf.low, ymax = conf.high), position = position_dodge(.2), size = 1) +
+  facet_grid(~model) +
+  scale_color_manual(name = "", values = palette_content) +
+  labs(x = "", y = "mean predicted rating\n") +
+  plot_aes +
+  theme(legend.position = c(.85, .15))
+
+# causal analysis plot
+causal = predicted_h3_h4 %>%
+  mutate(group = gsub(" sharing", "", group)) %>%
+  ggplot(aes(x = x, y = predicted, color = facet)) + 
+  stat_summary(aes(group = facet), fun.y = "mean", geom = "line", position = position_dodge(.2), size = 1) + 
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), position = position_dodge(.2), size = 1) +
+  facet_grid(~group) +
+  scale_color_manual(name = "", values = palette_content) +
+  scale_alpha_manual(name = "", values = c(1, .5)) +
+  labs(x = "", y = "mean predicted sharing intention rating\n") +
+  scale_y_continuous(limits = c(40, 60)) +
+  plot_aes +
+  theme(legend.position = c(.85, .15))
+
+cowplot::plot_grid(check, causal, labels = c("A", "B"))
+```
+
+## bayesian parallel mediation {.tabset}
+To include both self and social relevance as parallel mediators of the relationship between the experimental condition (self, social, or control) and sharing intentions, we estimated four separate models using `{brms}`.
+
+### prep data
+```{r}
+# create self condition dataframe
+data_med_self = study6 %>%
+  filter(group == "self") %>%
+  mutate(sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast")) %>%
+  spread(sharing_type, msg_share) %>%
+  select(SID, article_cond, trial, msg_rel_social, msg_rel_self, broadcast, narrowcast)
+
+# create social condition dataframe
+data_med_social = study6 %>%
+  filter(group == "social") %>%
+  mutate(sharing_type = ifelse(sharing_type == 0, "broadcast", "narrowcast")) %>%
+  spread(sharing_type, msg_share) %>%
+  select(SID, article_cond, trial, msg_rel_self, msg_rel_social, broadcast, narrowcast)
+
+# set seed
+seed = 6523
+```
+
+### self condition {.tabset}
+Test whether there is an indirect effect through social relevance, such that the self relevance manipulation will be associated with higher social relevance ratings, which in turn will be related to stronger a) broadcast and b) narrowcast sharing intentions.
+
+#### broadcast intentions
+```{r}
+x_var = "self"
+y_var = "broadcast"
+model_name = "mediation_self_broadcast_brm"
+data = data_med_self
+model_formula = bf(msg_rel_social ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(msg_rel_self ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + msg_rel_social + msg_rel_self + (1 +  msg_rel_social + msg_rel_self |i| SID)")) +
+  set_rescor(FALSE)
+
+model_self_broad = run_brm_model(model_name, model_formula, y_var, data)
+get_paths(model_self_broad, x_var, y_var)
+percent_mediated(model_self_broad, x_var, y_var)
+```
+
+#### narrowcast intentions
+```{r}
+x_var = "self"
+y_var = "narrowcast"
+model_name = "mediation_self_narrowcast_brm"
+data = data_med_self
+model_formula = bf(msg_rel_social ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(msg_rel_self ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + msg_rel_social + msg_rel_self + (1 +  msg_rel_social + msg_rel_self |i| SID)")) +
+  set_rescor(FALSE)
+
+model_self_narrow = run_brm_model(model_name, model_formula, y_var, data)
+get_paths(model_self_narrow, x_var, y_var)
+percent_mediated(model_self_narrow, x_var, y_var)
+```
+
+### social condition {.tabset}
+
+Test whether there is an indirect effect through social relevance, such that the social relevance manipulation will be associated with higher social relevance ratings, which in turn will be related to stronger a) broadcast and b) narrowcast sharing intentions.
+
+#### broadcast intentions
+```{r}
+x_var = "social"
+y_var = "broadcast"
+m_var = "msg_rel_self"
+model_name = "mediation_social_broadcast_brm"
+data = data_med_social
+model_formula = bf(msg_rel_social ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(msg_rel_self ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + msg_rel_social + msg_rel_self + (1 +  msg_rel_social + msg_rel_self |i| SID)")) +
+  set_rescor(FALSE)
+
+model_social_broad = run_brm_model(model_name, model_formula, y_var, data)
+get_paths(model_social_broad, x_var, y_var)
+percent_mediated(model_social_broad, x_var, y_var)
+```
+
+#### narrowcast intentions
+```{r}
+x_var = "social"
+y_var = "narrowcast"
+m_var = "msg_rel_self"
+model_name = "mediation_social_narrowcast_brm"
+data = data_med_social
+model_formula = bf(msg_rel_social ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(msg_rel_self ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + msg_rel_social + msg_rel_self + (1 +  msg_rel_social + msg_rel_self |i| SID)")) +
+  set_rescor(FALSE)
+
+model_social_narrow = run_brm_model(model_name, model_formula, y_var, data)
+get_paths(model_social_narrow, x_var, y_var)
+percent_mediated(model_social_narrow, x_var, y_var)
+```
+
+### combined plot
+
+```{r, fig.width = 9, fig.height = 4.5}
+labels = data.frame(model = c("self", "social"),
+                    outcome = c("broadcast", "narrowcast"),
+                    value = c(1, 1))
+
+create_paths(model_self_broad, "self", "broadcast") %>%
+  bind_rows(create_paths(model_self_narrow, "self", "narrowcast")) %>%
+  bind_rows(create_paths(model_social_broad, "social", "broadcast")) %>%
+  bind_rows(create_paths(model_social_narrow, "social", "narrowcast")) %>%
+  select(model, outcome, a1b1_cov_a1b1, a2b2_cov_a2b2) %>% 
+  gather(path, value, -model, -outcome) %>%
+  mutate(path = ifelse(path == "a1b1_cov_a1b1", "self-relevance", "social relevance")) %>%
+  ggplot(aes(x = value, y = "", fill = path)) +
+  geom_rect(data = labels,
+            aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf),
+            alpha = .5, fill = "grey") +
+  stat_halfeye(alpha = .8) +
+  facet_grid(model ~ outcome) +
+  scale_y_discrete(expand = c(.1, 0)) +
+  scale_fill_manual(values = palette_relevance, name = "mediator") +
+  labs(x = "indirect effect", y = "") +
+  plot_aes
+```
+
+
+## word count analyses {.tabset}
+In these analyses we looked at how depth of processing, operationalized as word count, is related to the outcomes of interest.
+
+### word count by condition
+Does word count differ by condition?
+
+#### summarize
+```{r}
+n_words = study6_comments %>%
+  mutate(study = "study 6",
+         item = sprintf("%s_%s", content, article_number),
+         SID = sprintf("%s_%s", study, SID)) %>%
+  group_by(article_cond, SID, item) %>%
+  tidytext::unnest_tokens(word, value) %>%
+  summarize(n = n()) 
+
+words_ratings = n_words %>%
+  left_join(., study6, by = c()) %>%
+  ungroup() %>%
+  mutate(n_c = n - mean(n, na.rm = TRUE))
+
+n_words %>%
+  group_by(article_cond) %>%
+  summarize(mean = mean(n, na.rm = TRUE),
+            sd = sd(n, na.rm = TRUE),
+            min = min(n, na.rm = TRUE),
+            max = max(n, na.rm = TRUE)) %>%
+  kable(digits = 2) %>%
+  kableExtra::kable_styling()
+```
+
+#### rsharing
+```{r}
+mod_words = lmer(n ~ 1 + article_cond + (1 | SID),
+              data = n_words,
+              control = lmerControl(optimizer = "bobyqa"))
+
+table_model(mod_words, eff_size = FALSE)
+```
+
+#### self-relevance
+```{r}
+mod_words_h1 = lmer(msg_rel_self ~ 1 + n_c + (1 + n_c | SID),
+              data = words_ratings,
+              control = lmerControl(optimizer = "bobyqa"))
+
+table_model(mod_words_h1, eff_size = FALSE)
+```
+
+#### social relevance
+```{r}
+mod_words_h2 = lmer(msg_rel_social ~ 1 + n_c + (1 + n_c | SID),
+              data = words_ratings,
+              control = lmerControl(optimizer = "bobyqa"))
+
+table_model(mod_words_h2, eff_size = FALSE)
+```
+
+### mediation models {.tabset}
+Is the relationship between experimental condition (self, social, or control) and relevance (self or social) mediated by word count?
+
+#### self --> self relevance
+```{r}
+x_var = "self"
+y_var = "msg_rel_self"
+model_name = "mediation_self_words_selfrelevance_brm"
+data = words_ratings %>%
+  filter(group == "self")
+model_formula = bf(n_c ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + n_c + (1 + n_c |i| SID)")) +
+  set_rescor(FALSE)
+
+model_self_word = run_brm_model(model_name, model_formula, y_var, data)
+get_paths_words(model_self_word, x_var, y_var)
+percent_mediated_words(model_self_word, x_var, y_var)
+```
+
+#### self --> social relevance
+```{r}
+x_var = "self"
+y_var = "msg_rel_social"
+model_name = "mediation_self_words_socialrelevance_brm"
+data = words_ratings %>%
+  filter(group == "self")
+model_formula = bf(n_c ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + n_c + (1 + n_c |i| SID)")) +
+  set_rescor(FALSE)
+
+model_self_word = run_brm_model(model_name, model_formula, y_var, data)
+get_paths_words(model_self_word, x_var, y_var)
+percent_mediated_words(model_self_word, x_var, y_var)
+```
+
+#### social --> social relevance
+```{r}
+x_var = "social"
+y_var = "msg_rel_social"
+model_name = "mediation_social_words_socialrelevance_brm"
+data = words_ratings %>%
+  filter(group == "social")
+model_formula = bf(n_c ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + n_c + (1 + n_c |i| SID)")) +
+  set_rescor(FALSE)
+
+model_social_word = run_brm_model(model_name, model_formula, y_var, data)
+get_paths_words(model_social_word, x_var, y_var)
+percent_mediated_words(model_social_word, x_var, y_var)
+```
+
+#### social --> self relevance
+```{r}
+x_var = "social"
+y_var = "msg_rel_self"
+model_name = "mediation_social_words_selfrelevance_brm"
+data = words_ratings %>%
+  filter(group == "social")
+model_formula = bf(n_c ~ article_cond + (1 + article_cond |i| SID)) +
+  bf(paste0(y_var, " ~ article_cond + n_c + (1 + n_c |i| SID)")) +
+  set_rescor(FALSE)
+
+model_social_word = run_brm_model(model_name, model_formula, y_var, data)
+get_paths_words(model_social_word, x_var, y_var)
+percent_mediated_words(model_social_word, x_var, y_var)
 ```

@@ -244,7 +244,8 @@ predicted %>%
   guides(linetype = guide_legend(override.aes = list(fill = NA))) +
   labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
   plot_aes  +
-  theme(legend.position = "top")
+  theme(legend.position = "top",
+        legend.key.width=unit(2,"cm"))
 ```
 
 ### model summary table
@@ -409,7 +410,8 @@ points = data_downsample %>%
   guides(linetype = guide_legend(override.aes = list(fill = NA))) +
   labs(x = "\nstandardized relevance rating", y = "predicted standardized sharing intention rating\n") +
   plot_aes  +
-  theme(legend.position = "top"))
+  theme(legend.position = "top",
+        legend.key.width=unit(2,"cm")))
 ```
 
 ### model summary table

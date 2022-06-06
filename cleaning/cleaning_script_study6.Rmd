@@ -262,7 +262,7 @@ surveys_clean = surveys %>%
   filter(!SID %in% failed_subs$SID) %>% # exclude participants
   filter(!item == "MID") %>% #remove MIDs 
   select(cond, SID, survey_name, item, value) %>%
-  filter(grepl("relevance_self|relevance_social|sharing|stim_order|cond_order|gender|race|hispanic_latinx|ses_degree|income_household|^age$|state", item)) # filter relevant variables
+  filter(grepl("relevance_self|relevance_social|sharing|stim_order|cond_order|gender|race|hispanic_latinx|ses_degree|income_household|^age$|state|comment", item)) # filter relevant variables
 
 # spread to wide format
 surveys_clean_wide = surveys_clean %>%
