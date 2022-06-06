@@ -1,7 +1,7 @@
 # self-social-sharing
 This repository contains code for the analyses reported in the following manuscript:
 
-**Cosme et al. (Preprint) Message self and social relevance increases intentions to share content: Correlational and causal evidence from six studies**
+[**Cosme et al. (Preprint) Message self and social relevance increases intentions to share content: Correlational and causal evidence from six studies**](https://psyarxiv.com/9cxfj)
 
 
 ## Compiled analysis files
@@ -30,6 +30,7 @@ Individual demographic data is not shared publicly due to concerns related to po
 
 ````
 ├── analysis
+│   ├── analysis.Rproj
 │   ├── causal.Rmd
 │   ├── causal.html
 │   ├── correlational.Rmd
@@ -41,9 +42,17 @@ Individual demographic data is not shared publicly due to concerns related to po
 │   ├── indirectMLM.R
 │   ├── models
 │   │   ├── model_mediation_self_broadcast.RDS
-│   │   ├── model_mediation_selfnarrowcast.RDS
+│   │   ├── model_mediation_self_broadcast_brm.RDS
+│   │   ├── model_mediation_self_narrowcast.RDS
+│   │   ├── model_mediation_self_narrowcast_brm.RDS
+│   │   ├── model_mediation_self_words_selfrelevance_brm.RDS
+│   │   ├── model_mediation_self_words_socialrelevance_brm.RDS
 │   │   ├── model_mediation_social_broadcast.RDS
+│   │   ├── model_mediation_social_broadcast_brm.RDS
 │   │   ├── model_mediation_social_narrowcast.RDS
+│   │   ├── model_mediation_social_narrowcast_brm.RDS
+│   │   ├── model_mediation_social_words_selfrelevance_brm.RDS
+│   │   ├── model_mediation_social_words_socialrelevance_brm.RDS
 │   │   └── sca_output.RDS
 │   ├── sca.Rmd
 │   ├── sca.html
@@ -79,7 +88,8 @@ Individual demographic data is not shared publicly due to concerns related to po
 │   ├── study5.csv
 │   ├── study5_clean_long.csv
 │   ├── study6.csv
-│   └── study6_clean_long.csv
+│   ├── study6_clean_long.csv
+│   └── study6_comments.csv
 └── stimuli
     ├── study4_articles.csv
     ├── study5_articles.csv
